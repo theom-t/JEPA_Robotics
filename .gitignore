@@ -15,7 +15,6 @@ checkpoints/
 models/
 
 # Datasets
-data/
 datasets/
 *.parquet
 *.mp4
