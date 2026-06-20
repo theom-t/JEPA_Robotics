@@ -26,3 +26,8 @@ This document tracks the high-level software architecture for the Cross-Embodime
 ## 5. Hardware & Environment
 *   **Training:** Local NVIDIA RTX 5090 (Blackwell architecture). Requires JAX `0.6.2` via `pip` (CUDA 12.8 compatible).
 *   **Edge Inference:** NVIDIA Jetson Orin Nano (NVMe boot).
+
+## 6. Testing & Verification Protocol
+*   **Framework:** `pytest` is the mandated testing framework for all modules.
+*   **Directory:** All tests reside in the `tests/` directory mirroring the `src/` layout.
+*   **Coverage:** `pytest-cov` should be used to monitor coverage on JAX tensor operations and mathematical boundaries.

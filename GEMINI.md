@@ -13,6 +13,7 @@ These rules govern the development of the Cross-Embodiment Latent World Model an
 
 ## 3. Project Guidelines
 - **Project Structure:** Code should be organized into a clean `src/` or `jepa_robotics/` package layout. Separate data ingestion, model architecture, and training loops into distinct modules.
+- **Testing Protocol:** All new modules MUST be accompanied by a unit test in the `tests/` directory using `pytest`. Test coverage must be maintained.
 - **Type Hinting:** All Python functions must include clear type hints and return types.
 - **Docstrings:** Use Google-style docstrings for all functions and classes.
 - **Data Hygiene:** Always ensure data shapes and types are explicitly verified, especially when formatting the 7D Cartesian task space vectors.

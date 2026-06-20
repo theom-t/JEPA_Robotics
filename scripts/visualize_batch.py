@@ -23,7 +23,7 @@ def visualize_batch(loader, dataset_name: str):
         axes[i].imshow(img)
         axes[i].set_title(f"Frame {i}")
         
-        cartesian = batch.get("cartesian_states", None)
+        cartesian = batch.get("state_7d", None)
         if cartesian is not None:
             xyz = cartesian[0][:3]
             axes[i].text(10, 20, f"X:{xyz[0]:.2f} Y:{xyz[1]:.2f} Z:{xyz[2]:.2f}", 

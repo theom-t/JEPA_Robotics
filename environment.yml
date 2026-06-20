@@ -25,3 +25,5 @@ dependencies:
     - matplotlib
     - einops     # Essential for transformer/JEPA tensor manipulations
     - lerobot    # Hugging Face lerobot library for dataset streaming
+    - pytest
+    - pytest-cov
