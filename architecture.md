@@ -1,0 +1,28 @@
+# JEPA Robotics - System Architecture
+
+This document tracks the high-level software architecture for the Cross-Embodiment Latent World Model.
+
+## 1. Data Ingestion & Preprocessing
+*   **Path:** `src/jepa_robotics/data/`
+*   **Design Pattern:** Object-Oriented inheritance model. `BaseRobotDataset` acts as the contract for all robot loaders.
+*   **Implementations:**
+    *   `BridgeDataLoader`: WidowX 250 data.
+    *   `SO100DataLoader`: LeRobot SO100 data.
+*   **Goal:** Convert varying inputs (Hugging Face datasets, MP4s, Parquet files, TFRecords) into uniform JAX batches: `(Images, Joint States, Joint Actions)`.
+
+## 2. Kinematics Engine
+*   **Path:** `src/jepa_robotics/data/kinematics.py`
+*   **Core Function:** Maps arbitrary Degrees of Freedom (DoF) to a unified **7D Cartesian State Space** `[X, Y, Z, Roll, Pitch, Yaw, Gripper_State]`.
+*   **Technology:** JAX-accelerated matrix multiplications (Forward Kinematics based on Denavit-Hartenberg parameters).
+
+## 3. Perception Engine (V-JEPA) - *Planned*
+*   **Goal:** Compress raw pixel data into a dense, informative latent space without relying heavily on reconstruction.
+*   **Architecture:** Vision Transformer (ViT).
+*   **Target:** Highly modular so the encoder can be frozen, quantized, and deployed to edge hardware (Jetson Orin Nano) independently of the World Model.
+
+## 4. Latent World Model - *Planned*
+*   **Goal:** Predict future states and plan actions entirely within the latent space derived by the V-JEPA encoder, conditioned on the 7D Cartesian action space.
+
+## 5. Hardware & Environment
+*   **Training:** Local NVIDIA RTX 5090 (Blackwell architecture). Requires JAX `0.6.2` via `pip` (CUDA 12.8 compatible).
+*   **Edge Inference:** NVIDIA Jetson Orin Nano (NVMe boot).

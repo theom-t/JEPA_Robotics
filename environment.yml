@@ -15,6 +15,13 @@ dependencies:
   - wandb        # For logging metrics
   - pip:
     # RTX 5090 Blackwell Support - using nightlies, no conda CUDA packages
-    # (Install your chosen framework here, e.g. tf-nightly or JAX)
+    - jax[cuda12]
+    - flax
+    - optax
+    - tensorflow-cpu
+    - tensorflow-datasets
+    - datasets
+    - huggingface-hub
+    - matplotlib
     - einops     # Essential for transformer/JEPA tensor manipulations
     - lerobot    # Hugging Face lerobot library for dataset streaming

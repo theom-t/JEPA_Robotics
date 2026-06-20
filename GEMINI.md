@@ -4,7 +4,8 @@ These rules govern the development of the Cross-Embodiment Latent World Model an
 
 ## 1. Mandatory Logging Rule
 - **Logging Changes:** Any significant architectural changes, milestone completions, new feature additions, or major refactors MUST be logged in `log.md`.
-- **Format:** Each entry must include the date and time, followed by a brief description of the change and the reasoning behind it. 
+- **Architecture Log:** You MUST update `architecture.md` whenever making any relevant changes to the software architecture.
+- **Format:** Each entry in `log.md` must include the date and time, followed by a brief description of the change and the reasoning behind it. 
 
 ## 2. Hardware & Environment Restraints
 - **Blackwell GPU Support:** Training targets the RTX 5090. Do NOT install `conda` CUDA packages as they conflict with the Blackwell architecture. Use your chosen ML framework's nightlies (e.g., `tf-nightly`) installed strictly via `pip`.

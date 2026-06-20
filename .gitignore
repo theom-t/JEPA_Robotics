@@ -16,11 +16,20 @@ models/
 
 # Datasets
 datasets/
+data/
 *.parquet
 *.mp4
 *.hdf5
 *.h5
 *.tfrecord
+
+# Python Package metadata
+*.egg-info/
+build/
+dist/
+
+# Test Outputs
+visualize_*.png
 
 # IDE / OS
 .vscode/

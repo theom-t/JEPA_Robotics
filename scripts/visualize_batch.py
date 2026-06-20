@@ -2,52 +2,54 @@ import matplotlib.pyplot as plt
 import numpy as np
 from jepa_robotics.data.dataset_loaders import SO100DataLoader, BridgeDataLoader
 
-def visualize_batch(loader, robot_name: str, num_samples: int = 3):
-    """Pulls a batch from the loader and visualizes it."""
-    print(f"\nVisualizing batch for {robot_name}...")
-    
-    fig, axes = plt.subplots(1, num_samples, figsize=(15, 5))
-    if num_samples == 1:
-        axes = [axes]
-        
+def visualize_batch(loader, dataset_name: str):
+    print(f"\nVisualizing batch for {dataset_name}...")
     data_iterator = loader.load()
     
-    for i in range(num_samples):
+    limit = loader.limit if loader.limit is not None else 5
+    
+    fig, axes = plt.subplots(1, limit, figsize=(5 * limit, 5))
+    if limit == 1:
+        axes = [axes]
+        
+    for i in range(limit):
         try:
             batch = next(data_iterator)
         except StopIteration:
             break
             
-        # Extract the mock image and state (convert from JAX to NumPy for plotting)
+        # The image is expected to be [B, H, W, C]
         img = np.array(batch["image"][0])
-        state_7d = np.array(batch["state_7d"][0])
+        axes[i].imshow(img)
+        axes[i].set_title(f"Frame {i}")
         
-        ax = axes[i]
-        ax.imshow(img)
-        ax.axis('off')
+        cartesian = batch.get("cartesian_states", None)
+        if cartesian is not None:
+            xyz = cartesian[0][:3]
+            axes[i].text(10, 20, f"X:{xyz[0]:.2f} Y:{xyz[1]:.2f} Z:{xyz[2]:.2f}", 
+                        color='white', backgroundcolor='black')
         
-        # Display the 7D Cartesian vector on the image
-        text_str = f"X,Y,Z: {state_7d[0]:.2f}, {state_7d[1]:.2f}, {state_7d[2]:.2f}\n" \
-                   f"R,P,Y: {state_7d[3]:.2f}, {state_7d[4]:.2f}, {state_7d[5]:.2f}\n" \
-                   f"Gripper: {state_7d[6]:.2f}"
-                   
-        ax.set_title(f"Sample {i+1}", fontsize=10)
-        ax.text(0.05, 0.95, text_str, transform=ax.transAxes, fontsize=9,
-                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        axes[i].axis('off')
                 
-    plt.suptitle(f"{robot_name} Data Pipeline Check")
+    plt.suptitle(f"{dataset_name} Data Pipeline Check")
     plt.tight_layout()
     
-    save_path = f"visualize_{robot_name.lower()}.png"
+    save_path = f"visualize_{dataset_name.lower()}.png"
     plt.savefig(save_path)
     print(f"Saved visualization to {save_path}")
 
 if __name__ == "__main__":
-    # Test with a very small limit
-    print("Testing data pipelines...")
+    print("Testing data pipelines...\n")
     
-    bridge_loader = BridgeDataLoader(limit=3)
+    # Initialize loaders
+    bridge_loader = BridgeDataLoader(
+        limit=15
+    )
+    
+    so100_loader = SO100DataLoader(
+        hf_repo="lerobot/svla_so100_stacking",
+        limit=15
+    )
+    
     visualize_batch(bridge_loader, "BridgeData_WidowX")
-    
-    so100_loader = SO100DataLoader(limit=3)
     visualize_batch(so100_loader, "SO100")
