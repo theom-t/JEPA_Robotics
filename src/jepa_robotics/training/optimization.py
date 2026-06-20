@@ -13,7 +13,7 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
     # --- Perception Engine (V-JEPA) Hyperparameters ---
     latent_dim = Categorical("latent_dim", [128, 256, 512], default=256)
     vit_depth = Integer("vit_depth", (2, 8), default=4)
-    patch_size = Categorical("patch_size", [8, 16, 32], default=16)
+    patch_size = Categorical("patch_size", [16, 32, 64, 128], default=16)
     
     # V-JEPA Masking Hierarchy
     use_masking = Categorical("use_masking", [True, False], default=True)
@@ -27,7 +27,7 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
     tau = Float("tau", (0.99, 0.9999), default=0.996)
     learning_rate = Float("learning_rate", (1e-5, 1e-3), default=1e-4, log=True)
     weight_decay = Float("weight_decay", (1e-6, 1e-2), default=1e-4, log=True)
-    batch_size = Categorical("batch_size", [16, 32, 64], default=32)
+    batch_size = Categorical("batch_size", [8, 16, 32], default=32)
     seq_len = Integer("seq_len", (3, 10), default=5)
     activation_fn = Categorical("activation_fn", ["gelu", "silu", "relu"], default="gelu")
     loss_alpha = Float("loss_alpha", (0.1, 10.0), default=1.0)
@@ -66,7 +66,6 @@ def evaluation_function(config: Configuration, seed: int = 0) -> float:
     # Convert SMAC config to a standard dictionary
     config_dict = dict(config)
     config_dict["is_smac_run"] = True
-    config_dict["disable_wandb"] = True
     
     loss = train_model(config_dict, num_epochs=2)
     return float(loss)

@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
 import optax
-import wandb
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, Any
@@ -17,14 +16,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     and executes the training loop.
     Returns the final validation loss.
     """
-    # 1. Initialize Telemetry
-    # We use reinit=True so SMAC3 can run multiple trials sequentially in the same process
-    run = wandb.init(
-        project="JEPA_Robotics",
-        config=config,
-        reinit=True,
-        mode="disabled" if config.get("disable_wandb", False) else "online"
-    )
+    # 1. Telemetry is now disabled to run locally without a cloud account
     
     # 2. Instantiate Dynamic Architectures
     rng = jax.random.PRNGKey(42)
@@ -110,7 +102,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
         
         # We zip them to alternate batches cleanly
         epoch_losses = []
-        for bridge_batch, so100_batch in zip(bridge_iter, so100_iter):
+        pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch")
+        for bridge_batch, so100_batch in pbar:
             # Process BridgeData
             state, metrics_b = train_step_fn(state, bridge_batch, tau)
             
@@ -121,18 +114,15 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
             avg_loss = (metrics_b["loss"] + metrics_s["loss"]) / 2.0
             epoch_losses.append(avg_loss)
             
-            wandb.log({
-                "Bridge_Latent_Loss": metrics_b["latent_l2_loss"],
-                "SO100_Latent_Loss": metrics_s["latent_l2_loss"],
-                "Bridge_Temporal_Loss": metrics_b["temporal_dynamics_loss"],
-                "SO100_Temporal_Loss": metrics_s["temporal_dynamics_loss"],
-                "Combined_Loss": avg_loss
+            # Log telemetry locally via tqdm instead of spamming print statements
+            pbar.set_postfix({
+                "Bridge L": f"{metrics_b['loss']:.3f}", 
+                "SO100 L": f"{metrics_s['loss']:.3f}", 
+                "Avg L": f"{avg_loss:.3f}"
             })
             
         final_loss = np.mean(epoch_losses)
-        print(f"Epoch {epoch+1}/{num_epochs} - Loss: {final_loss:.4f}")
-        
-    wandb.finish()
+        print(f"\\n✅ Epoch {epoch+1} Completed - Avg Loss: {final_loss:.4f}\\n")
     
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)

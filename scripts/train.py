@@ -13,10 +13,18 @@ def run_single_mode():
     config = {
         "latent_dim": 256,
         "vit_depth": 4,
+        "patch_size": 16,
+        "use_masking": True,
+        "masking_ratio": 0.5,
         "wm_depth": 4,
         "num_heads": 8,
+        "batch_size": 16,
+        "seq_len": 5,
+        "activation_fn": "gelu",
         "learning_rate": 1e-4,
+        "weight_decay": 1e-4,
         "tau": 0.996,
+        "loss_alpha": 1.0,
         "disable_wandb": True # Disable logging for simple tests, switch to False for real telemetry
     }
     print("Running in SINGLE mode. Using default hyperparameter config.")

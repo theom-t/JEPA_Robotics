@@ -71,6 +71,9 @@ class BridgeDataLoader(BaseRobotDataset):
         
         raw_dataset = tf.data.TFRecordDataset(sliced_files, num_parallel_reads=tf.data.AUTOTUNE)
         
+        # Ignore corrupted/partial records so training doesn't crash while gcloud is still downloading
+        raw_dataset = raw_dataset.ignore_errors(log_warning=True)
+        
         def _parse_function(example_proto):
             feature_description = {
                 'steps/observation/image': tf.io.FixedLenSequenceFeature([], tf.string, allow_missing=True),
