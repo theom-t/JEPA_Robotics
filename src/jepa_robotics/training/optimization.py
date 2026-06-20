@@ -42,7 +42,8 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
         cs,
         deterministic=True, # JAX PRNG keys make evaluation deterministic
         n_trials=50,        # Number of architectures to evaluate
-        name=run_name
+        name=run_name,
+        output_directory="smac3_output" # Explicitly force the automatic JSON save behavior
     )
     
     return scenario

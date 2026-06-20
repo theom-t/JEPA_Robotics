@@ -64,12 +64,11 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
         "predictor_params": predictor_params,
         "wm_params": wm_params,
         "target_params": target_params,
-        "opt_state": opt_state,
-        "optimizer": optimizer
+        "opt_state": opt_state
     }
     
     # 4. Compile JAX Train Step
-    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def)
+    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, optimizer)
     
     # 5. Initialize Dataloaders
     # We use limits to keep the V1 mock training fast

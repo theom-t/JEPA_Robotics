@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import optax
 from typing import Dict, Any, Tuple
 
-def create_train_step(encoder_def, predictor_def, world_model_def):
+def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
     """
     Returns a JIT-compiled training step function bounded to the model definitions.
     """
@@ -67,7 +67,6 @@ def create_train_step(encoder_def, predictor_def, world_model_def):
         wm_params = state["wm_params"]
         target_params = state["target_params"]
         opt_state = state["opt_state"]
-        optimizer = state["optimizer"] # This is an optax transform, not a jax type, but we assume it's closed over
 
         # Calculate gradients
         grad_fn = jax.value_and_grad(loss_fn, argnums=(0, 1, 2), has_aux=True)
@@ -96,8 +95,7 @@ def create_train_step(encoder_def, predictor_def, world_model_def):
             "predictor_params": new_predictor_params,
             "wm_params": new_wm_params,
             "target_params": new_target_params,
-            "opt_state": new_opt_state,
-            "optimizer": optimizer
+            "opt_state": new_opt_state
         }
         
         return new_state, metrics

@@ -95,6 +95,7 @@ class SO100DataLoader(BaseRobotDataset):
             
             # OpenCV loads as BGR, convert to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_rgb = cv2.resize(frame_rgb, (256, 256))
             
             # Map HF dataset features to our pipeline expectations
             # The SO100 has 6 joints + 1 gripper = 7 DoF

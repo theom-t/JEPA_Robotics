@@ -39,3 +39,4 @@ visualize_*.png
 logs/
 *.log
 wandb/
+errors.txt
