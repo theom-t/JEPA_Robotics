@@ -41,10 +41,10 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     predictor_def = JEPAPredictor(latent_dim=latent_dim)
     wm_def = ActionConditionedTransformer(latent_dim=latent_dim, depth=wm_depth, num_heads=num_heads)
     
-    # Mock inputs for initialization
+    # Mock inputs for initialization (Batch=32, SeqLen-1=4 for World Model)
     mock_img = jnp.ones((1, 256, 256, 3))
-    mock_seq_latents = jnp.ones((1, 1, latent_dim))
-    mock_seq_actions = jnp.ones((1, 1, 7))
+    mock_seq_latents = jnp.ones((32, 4, latent_dim))
+    mock_seq_actions = jnp.ones((32, 4, 7))
     
     # Initialize parameters
     encoder_params = encoder_def.init(init_rng, mock_img)
@@ -70,10 +70,16 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     # 4. Compile JAX Train Step
     train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, optimizer)
     
-    # 5. Initialize Dataloaders
-    # We use limits to keep the V1 mock training fast
-    bridge_loader = BridgeDataLoader(limit=10)
-    so100_loader = SO100DataLoader(hf_repo="lerobot/svla_so100_stacking", limit=10)
+    # 5. Initialize Real Dataloaders (Sliding Window & Batching)
+    batch_size = 32
+    seq_len = 5
+    
+    # If SMAC is running, we stratify a 10% slice to ensure sweeps complete quickly.
+    # Otherwise, we use 100% of the dataset for the final multi-day training.
+    sample_fraction = 0.10 if config.get("is_smac_run", False) else 1.0
+    
+    bridge_loader = BridgeDataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
+    so100_loader = SO100DataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
     
     final_loss = 0.0
     

@@ -9,41 +9,37 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
     """
     
     def loss_fn(encoder_params, predictor_params, wm_params, target_params, batch: Dict[str, jnp.ndarray]):
-        images = batch["image"]
-        actions = batch["action_7d"]
+        images = batch["image"]           # (B, S, H, W, C)
+        actions = batch["action_7d"]      # (B, S, DoF)
         
         # 1. Perception Forward Pass
-        # We simulate a sequence by adding a seq_len dimension for the World Model.
-        # Right now dataloaders yield (Batch, C, H, W) for simplicity, 
-        # but the world model expects (Batch, Seq, Dim).
-        # We'll just expand dims for this V1 mock.
-        b, h, w, c = images.shape
+        b, s, h, w, c = images.shape
+        flat_images = images.reshape((b * s, h, w, c))
         
         # Context Encoder (E_x)
-        context_latents = encoder_def.apply(encoder_params, images)
+        context_latents = encoder_def.apply(encoder_params, flat_images)
+        context_latents = context_latents.reshape((b, s, -1))
         
-        # Target Encoder (E_y) - Stop gradient so we don't backprop through it
-        target_latents = encoder_def.apply(target_params, images)
+        # Target Encoder (E_y) - Stop gradient
+        target_latents = encoder_def.apply(target_params, flat_images)
         target_latents = jax.lax.stop_gradient(target_latents)
+        target_latents = target_latents.reshape((b, s, -1))
         
-        # Predictor (P) tries to guess the target
+        # Predictor (P) tries to guess the target latent of the current frame
         predicted_latents = predictor_def.apply(predictor_params, context_latents)
-        
-        # JEPA L2 Loss
         latent_loss = jnp.mean((predicted_latents - target_latents) ** 2)
         
         # 2. World Model Forward Pass
-        # Fake temporal dimension since we are currently loading single frames 
-        # in the V1 dataloaders rather than full sequences.
-        seq_latents = jnp.expand_dims(context_latents, axis=1)
-        seq_actions = jnp.expand_dims(actions, axis=1)
+        # We predict t+1 given t
+        # Context inputs: t=0 to t=S-2
+        seq_context = context_latents[:, :-1, :]
+        seq_actions = actions[:, :-1, :]
         
-        predicted_next_states = world_model_def.apply(wm_params, seq_latents, seq_actions)
+        predicted_next_states = world_model_def.apply(wm_params, seq_context, seq_actions)
         
         # Temporal Dynamics Loss 
-        # In a real sequence, we'd compare against seq_latents[:, 1:]
-        # Here we just mock compare it against itself to compile the graph
-        temporal_loss = jnp.mean((predicted_next_states - jnp.expand_dims(target_latents, axis=1)) ** 2)
+        # Compare against target latents at t=1 to t=S-1
+        temporal_loss = jnp.mean((predicted_next_states - target_latents[:, 1:, :]) ** 2)
         
         # 3. Total Loss
         total_loss = latent_loss + temporal_loss

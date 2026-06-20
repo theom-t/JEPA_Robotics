@@ -56,6 +56,7 @@ def evaluation_function(config, seed: int = 0) -> float:
     # Convert ConfigSpace object to a standard dict for our orchestrator
     config_dict = dict(config)
     config_dict["disable_wandb"] = False # Ensure telemetry runs during SMAC3
+    config_dict["is_smac_run"] = True    # Triggers the 10% dataloader slice
     
     from jepa_robotics.training.loop import train_model
     
