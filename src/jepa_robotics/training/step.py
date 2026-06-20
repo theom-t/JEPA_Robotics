@@ -3,9 +3,9 @@ import jax.numpy as jnp
 import optax
 from typing import Dict, Any, Tuple
 
-def create_train_step(encoder_def, predictor_def, world_model_def, probe_def, optimizer, loss_alpha: float = 1.0):
+def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimizer, loss_alpha: float = 1.0):
     """
-    Returns a JIT-compiled training step function bounded to the model definitions.
+    Returns JIT-compiled train and eval step functions bounded to the model definitions.
     """
     
     def loss_fn(encoder_params, predictor_params, wm_params, probe_params, target_params, batch: Dict[str, jnp.ndarray], rng: jax.Array):
@@ -111,4 +111,25 @@ def create_train_step(encoder_def, predictor_def, world_model_def, probe_def, op
         
         return new_state, metrics
 
-    return train_step
+    @jax.jit
+    def eval_step(state: Dict[str, Any], batch: Dict[str, jnp.ndarray]) -> Dict[str, jnp.ndarray]:
+        """
+        Executes a pure forward pass for validation, computing loss metrics without any gradients or EMA updates.
+        """
+        encoder_params = state["encoder_params"]
+        predictor_params = state["predictor_params"]
+        wm_params = state["wm_params"]
+        probe_params = state["probe_params"]
+        target_params = state["target_params"]
+        
+        # We still need an RNG for the loss_fn signature, but since train=False we don't strictly need dropout
+        rng = state["rng"]
+        
+        # Call loss_fn to get metrics
+        total_loss, metrics = loss_fn(
+            encoder_params, predictor_params, wm_params, probe_params, target_params, batch, rng
+        )
+        
+        return metrics
+
+    return train_step, eval_step

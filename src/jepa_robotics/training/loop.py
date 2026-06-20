@@ -7,10 +7,10 @@ from typing import Dict, Any
 
 from jepa_robotics.models.v_jepa import ViTEncoder, JEPAPredictor, StateLinearProbe
 from jepa_robotics.models.world_model import ActionConditionedTransformer
-from jepa_robotics.training.step import create_train_step
+from jepa_robotics.training.step import create_steps
 from jepa_robotics.data.dataset_loaders import BridgeDataLoader, SO100DataLoader
 
-def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
+def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = True) -> float:
     """
     Core orchestrator that binds dataloaders, compiles the network, 
     and executes the training loop.
@@ -84,8 +84,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
         "rng": rng
     }
     
-    # 4. Compile JAX Train Step
-    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, probe_def, optimizer, loss_alpha)
+    # 4. Compile JAX Train and Eval Steps
+    train_step_fn, eval_step_fn = create_steps(encoder_def, predictor_def, wm_def, probe_def, optimizer, loss_alpha)
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)
     # If SMAC is running, we stratify a 10% slice to ensure sweeps complete quickly.
@@ -94,6 +94,10 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     
     bridge_loader = BridgeDataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
     so100_loader = SO100DataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
+    
+    if do_eval:
+        bridge_val_loader = BridgeDataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
+        so100_val_loader = SO100DataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
     
     final_loss = 0.0
     
@@ -127,7 +131,37 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
             })
             
         final_loss = np.mean(epoch_losses)
-        print(f"\\n✅ Epoch {epoch+1} Completed - Avg Loss: {final_loss:.4f}\\n")
-    
+        print(f"\\n✅ Epoch {epoch+1} Train Completed - Avg Loss: {final_loss:.4f}\\n")
+        
+        if do_eval:
+            val_epoch_losses = []
+            val_probe_mses = []
+            
+            bridge_val_iter = bridge_val_loader.load(split="val")
+            so100_val_iter = so100_val_loader.load(split="val")
+            
+            pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch")
+            for bridge_val_batch, so100_val_batch in pbar_val:
+                metrics_b_val = eval_step_fn(state, bridge_val_batch)
+                metrics_s_val = eval_step_fn(state, so100_val_batch)
+                
+                avg_val_loss = (metrics_b_val["loss"] + metrics_s_val["loss"]) / 2.0
+                avg_val_probe_mse = (metrics_b_val["probe_loss"] + metrics_s_val["probe_loss"]) / 2.0
+                
+                val_epoch_losses.append(avg_val_loss)
+                val_probe_mses.append(avg_val_probe_mse)
+                
+                pbar_val.set_postfix({
+                    "Val Avg L": f"{avg_val_loss:.3f}",
+                    "Val Probe MSE": f"{avg_val_probe_mse:.3f}"
+                })
+                
+            final_val_loss = np.mean(val_epoch_losses)
+            final_val_probe = np.mean(val_probe_mses)
+            print(f"\\n🎯 Epoch {epoch+1} Validation Completed - Val Avg Loss: {final_val_loss:.4f} | Val Probe MSE: {final_val_probe:.4f}\\n")
+            
+            # If evaluating, return the validation loss to SMAC so we optimize for generalization!
+            final_loss = final_val_loss
+            
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)

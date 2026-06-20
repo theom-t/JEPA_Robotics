@@ -57,27 +57,29 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
 
 from ConfigSpace import Configuration
 
-def evaluation_function(config: Configuration, seed: int = 0) -> float:
-    """
-    The function SMAC calls to evaluate a given architecture.
-    """
-    from jepa_robotics.training.loop import train_model
-    
-    # Convert SMAC config to a standard dictionary
-    config_dict = dict(config)
-    config_dict["is_smac_run"] = True
-    
-    loss = train_model(config_dict, num_epochs=2)
-    return float(loss)
+def get_evaluation_function(do_eval: bool):
+    def evaluation_function(config: Configuration, seed: int = 0) -> float:
+        """
+        The function SMAC calls to evaluate a given architecture.
+        """
+        from jepa_robotics.training.loop import train_model
+        
+        # Convert SMAC config to a standard dictionary
+        config_dict = dict(config)
+        config_dict["is_smac_run"] = True
+        
+        loss = train_model(config_dict, num_epochs=2, do_eval=do_eval)
+        return float(loss)
+    return evaluation_function
 
-def run_smac_optimization():
+def run_smac_optimization(do_eval: bool = True):
     """Executes the SMAC3 optimization loop."""
     scenario = build_smac_scenario()
     
     # Use the Facade for standard Hyperparameter Optimization
     smac = HyperparameterOptimizationFacade(
         scenario, 
-        evaluation_function
+        get_evaluation_function(do_eval)
     )
     
     incumbent = smac.optimize()

@@ -53,8 +53,8 @@ class BridgeDataLoader(BaseRobotDataset):
         
         print(f"Loading REAL BridgeData V2 (Raw TFRecord) from {self.tfds_data_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
         
-        # Use glob to find all tfrecord shards for this split
-        search_pattern = os.path.join(self.tfds_data_dir, "bridge", "0.1.0", f"bridge-{split}.tfrecord*")
+        actual_split = "test" if split == "val" else split
+        search_pattern = os.path.join(self.tfds_data_dir, "bridge", "0.1.0", f"bridge-{actual_split}.tfrecord*")
         files = glob.glob(search_pattern)
         
         if not files:
@@ -143,11 +143,19 @@ class SO100DataLoader(BaseRobotDataset):
         
         # Load the states/actions metadata (Parquet) strictly from the offline cache
         # Note: If it's cached, HF automatically loads offline.
-        dataset = load_dataset(self.hf_repo, split=split, cache_dir=self.offline_dir)
+        dataset = load_dataset(self.hf_repo, split="train", cache_dir=self.offline_dir)
         
-        # Calculate EXACT subset and apply stratified shuffle to mix trajectories
+        # Hard 90/10 split to ensure completely disjoint subsets for train/val
         total_rows = len(dataset)
-        slice_rows = int(total_rows * self.sample_fraction)
+        split_idx = int(total_rows * 0.9)
+        
+        if split == "val":
+            dataset = dataset.select(range(split_idx, total_rows))
+        else:
+            dataset = dataset.select(range(split_idx))
+            
+        # Calculate EXACT subset and apply stratified shuffle to mix trajectories
+        slice_rows = int(len(dataset) * self.sample_fraction)
         dataset = dataset.shuffle(seed=42).select(range(slice_rows))
         
         # For HF LeRobot datasets, the video is chunked. For simplicity in this iterator,
