@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from ConfigSpace import ConfigurationSpace, Integer, Float, Categorical
+from ConfigSpace import ConfigurationSpace, Integer, Float, Categorical, EqualsCondition
 from smac import HyperparameterOptimizationFacade, Scenario
 
 def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
@@ -11,57 +11,63 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
     cs = ConfigurationSpace()
     
     # --- Perception Engine (V-JEPA) Hyperparameters ---
-    # The size of the dense latent vector we compress images into.
-    # 256 is fast for Jetson Orin Nano, 512 is better for complex physics.
     latent_dim = Categorical("latent_dim", [128, 256, 512], default=256)
-    
-    # Depth of the Vision Transformer
     vit_depth = Integer("vit_depth", (2, 8), default=4)
+    patch_size = Categorical("patch_size", [8, 16, 32], default=16)
+    
+    # V-JEPA Masking Hierarchy
+    use_masking = Categorical("use_masking", [True, False], default=True)
+    masking_ratio = Float("masking_ratio", (0.5, 0.9), default=0.7)
     
     # --- World Model Hyperparameters ---
     wm_depth = Integer("wm_depth", (2, 6), default=4)
-    
-    # We must ensure num_heads cleanly divides latent_dim.
-    # For a categorical latent_dim, we can just use 4 or 8 heads since they 
-    # divide 128, 256, and 512 cleanly.
     num_heads = Categorical("num_heads", [4, 8], default=8)
     
-    # --- JEPA Training Dynamics ---
-    # EMA update rate (tau) for the Target Encoder.
-    # Closer to 1.0 means slower, more stable target updates.
+    # --- Temporal & Optimizer Dynamics ---
     tau = Float("tau", (0.99, 0.9999), default=0.996)
-    
-    # Learning rate
     learning_rate = Float("learning_rate", (1e-5, 1e-3), default=1e-4, log=True)
+    weight_decay = Float("weight_decay", (1e-6, 1e-2), default=1e-4, log=True)
+    batch_size = Categorical("batch_size", [16, 32, 64], default=32)
+    seq_len = Integer("seq_len", (3, 10), default=5)
+    activation_fn = Categorical("activation_fn", ["gelu", "silu", "relu"], default="gelu")
+    loss_alpha = Float("loss_alpha", (0.1, 10.0), default=1.0)
     
-    cs.add_hyperparameters([latent_dim, vit_depth, wm_depth, num_heads, tau, learning_rate])
+    cs.add_hyperparameters([
+        latent_dim, vit_depth, patch_size, 
+        use_masking, masking_ratio,
+        wm_depth, num_heads, 
+        tau, learning_rate, weight_decay,
+        batch_size, seq_len, activation_fn, loss_alpha
+    ])
+    
+    # Inject SMAC Hierarchy: masking_ratio is ONLY active if use_masking is True
+    cs.add_condition(EqualsCondition(masking_ratio, use_masking, True))
     
     # Define the Scenario
     # We want to minimize the combined loss (L2 Latent + Temporal Dynamics)
     scenario = Scenario(
         cs,
         deterministic=True, # JAX PRNG keys make evaluation deterministic
-        n_trials=50,        # Number of architectures to evaluate
+        n_trials=2,        # Number of architectures to evaluate
         name=run_name,
         output_directory="smac3_output" # Explicitly force the automatic JSON save behavior
     )
     
     return scenario
 
-def evaluation_function(config, seed: int = 0) -> float:
+from ConfigSpace import Configuration
+
+def evaluation_function(config: Configuration, seed: int = 0) -> float:
     """
-    Executes the real JAX training loop via our dual-mode orchestrator.
-    Returns the final validation loss.
+    The function SMAC calls to evaluate a given architecture.
     """
-    # Convert ConfigSpace object to a standard dict for our orchestrator
-    config_dict = dict(config)
-    config_dict["disable_wandb"] = False # Ensure telemetry runs during SMAC3
-    config_dict["is_smac_run"] = True    # Triggers the 10% dataloader slice
-    
     from jepa_robotics.training.loop import train_model
     
-    # We use a short number of epochs (e.g., 2) for the SMAC3 sweep evaluation 
-    # to find the pareto front quickly.
+    # Convert SMAC config to a standard dictionary
+    config_dict = dict(config)
+    config_dict["is_smac_run"] = True
+    config_dict["disable_wandb"] = True
+    
     loss = train_model(config_dict, num_epochs=2)
     return float(loss)
 

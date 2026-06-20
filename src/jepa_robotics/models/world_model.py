@@ -11,6 +11,7 @@ class ActionConditionedTransformer(nn.Module):
     depth: int = 4
     num_heads: int = 8
     mlp_dim: int = 1024
+    activation_fn: str = "gelu"
     
     @nn.compact
     def __call__(self, latents, actions):
@@ -51,7 +52,8 @@ class ActionConditionedTransformer(nn.Module):
             # MLP block
             y = nn.LayerNorm()(x)
             y = nn.Dense(self.mlp_dim)(y)
-            y = nn.gelu(y)
+            act = getattr(nn, self.activation_fn)
+            y = act(y)
             y = nn.Dense(self.latent_dim)(y)
             x = x + y
             

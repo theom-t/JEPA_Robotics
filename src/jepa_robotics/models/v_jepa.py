@@ -6,11 +6,13 @@ class MLPBlock(nn.Module):
     """A standard MLP block used in Vision Transformers."""
     mlp_dim: int
     out_dim: int
+    activation_fn: str = "gelu"
 
     @nn.compact
     def __call__(self, inputs):
         x = nn.Dense(self.mlp_dim)(inputs)
-        x = nn.gelu(x)
+        act = getattr(nn, self.activation_fn)
+        x = act(x)
         x = nn.Dense(self.out_dim)(x)
         return x
 
@@ -18,6 +20,7 @@ class Encoder1DBlock(nn.Module):
     """Transformer block for the ViT encoder."""
     mlp_dim: int
     num_heads: int
+    activation_fn: str = "gelu"
 
     @nn.compact
     def __call__(self, inputs):
@@ -28,7 +31,7 @@ class Encoder1DBlock(nn.Module):
 
         # MLP block
         y = nn.LayerNorm()(x)
-        y = MLPBlock(mlp_dim=self.mlp_dim, out_dim=inputs.shape[-1])(y)
+        y = MLPBlock(mlp_dim=self.mlp_dim, out_dim=inputs.shape[-1], activation_fn=self.activation_fn)(y)
         return x + y
 
 class ViTEncoder(nn.Module):
@@ -41,14 +44,16 @@ class ViTEncoder(nn.Module):
     num_heads: int = 8
     mlp_dim: int = 1024
     patch_size: int = 16
+    activation_fn: str = "gelu"
+    use_masking: bool = True
+    masking_ratio: float = 0.7
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, x, train: bool = True):
         # x shape: (batch_size, H, W, C)
         b, h, w, c = x.shape
         
         # Simple patch embedding: we use a dense layer on flattened patches
-        # For a more robust implementation, we would use a Conv layer with stride=patch_size
         x = nn.Conv(features=self.latent_dim, kernel_size=(self.patch_size, self.patch_size), 
                     strides=(self.patch_size, self.patch_size), padding="VALID")(x)
         
@@ -59,10 +64,14 @@ class ViTEncoder(nn.Module):
         num_patches = x.shape[1]
         pos_embedding = self.param('pos_embedding', nn.initializers.normal(stddev=0.02), (1, num_patches, self.latent_dim))
         x = x + pos_embedding
+        
+        # Random Patch Dropout (Masking)
+        if self.use_masking and self.masking_ratio > 0.0:
+            x = nn.Dropout(rate=self.masking_ratio, broadcast_dims=(-1,))(x, deterministic=not train)
 
         # Apply Transformer blocks
         for _ in range(self.depth):
-            x = Encoder1DBlock(mlp_dim=self.mlp_dim, num_heads=self.num_heads)(x)
+            x = Encoder1DBlock(mlp_dim=self.mlp_dim, num_heads=self.num_heads, activation_fn=self.activation_fn)(x)
             
         x = nn.LayerNorm()(x)
         
@@ -80,6 +89,7 @@ class JEPAPredictor(nn.Module):
     depth: int = 2
     num_heads: int = 8
     mlp_dim: int = 1024
+    activation_fn: str = "gelu"
     
     @nn.compact
     def __call__(self, context_latents):
@@ -89,7 +99,8 @@ class JEPAPredictor(nn.Module):
         for _ in range(self.depth):
             # Using simple Dense blocks for pooled predictor
             y = nn.Dense(self.mlp_dim)(x)
-            y = nn.gelu(y)
+            act = getattr(nn, self.activation_fn)
+            y = act(y)
             y = nn.Dense(self.latent_dim)(y)
             x = x + y
         return x

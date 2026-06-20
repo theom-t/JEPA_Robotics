@@ -40,41 +40,69 @@ class BaseRobotDataset:
         return batch
 
 class BridgeDataLoader(BaseRobotDataset):
-    """Loader for BridgeData V2 (WidowX 250) using pure TFDS RLDS format."""
+    """Loader for BridgeData V2 (WidowX 250) using raw TFRecord parsing to bypass tfds."""
     def __init__(self, tfds_data_dir: str = "/home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2", sample_fraction: float = 1.0, **kwargs):
         super().__init__(**kwargs)
         self.tfds_data_dir = tfds_data_dir
         self.sample_fraction = sample_fraction
 
     def load(self, split: str = "train") -> Iterator[Dict[str, Any]]:
-        import tensorflow_datasets as tfds
         import tensorflow as tf
+        import glob
+        import os
         
-        print(f"Loading REAL BridgeData V2 (RLDS) from {self.tfds_data_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
+        print(f"Loading REAL BridgeData V2 (Raw TFRecord) from {self.tfds_data_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
         
-        # We enforce a deterministic seed and aggressive file shuffling to mathematically stratify tasks
-        read_config = tfds.ReadConfig(shuffle_seed=42, shuffle_files=True)
+        # Use glob to find all tfrecord shards for this split
+        search_pattern = os.path.join(self.tfds_data_dir, "bridge", "0.1.0", f"bridge-{split}.tfrecord*")
+        files = glob.glob(search_pattern)
         
-        builder = tfds.builder_from_directory(f"{self.tfds_data_dir}/bridge/0.1.0")
+        if not files:
+            raise FileNotFoundError(f"No TFRecord files found for split {split} at {search_pattern}")
+            
+        # Shuffle files deterministically
+        files = sorted(files)
+        np.random.seed(42)
+        np.random.shuffle(files)
         
-        # Calculate exactly what the 10% slice of episodes is
-        total_episodes = builder.info.splits[split].num_examples
-        slice_episodes = int(total_episodes * self.sample_fraction)
+        # Calculate exactly what the slice of files is
+        slice_files = max(1, int(len(files) * self.sample_fraction))
+        sliced_files = files[:slice_files]
         
-        # Apply the stratified slice
-        sliced_split = f"{split}[:{slice_episodes}]"
+        raw_dataset = tf.data.TFRecordDataset(sliced_files, num_parallel_reads=tf.data.AUTOTUNE)
         
-        dataset = builder.as_dataset(split=sliced_split, read_config=read_config)
-        
-        # In RLDS, each element is an 'episode' containing a dataset of 'steps'
-        def process_step(step):
-            img = step['observation']['image']
-            img = tf.image.resize(img, [256, 256])
-            img = tf.cast(img, tf.uint8)
-            return img, step['observation']['state'], step['action']
+        def _parse_function(example_proto):
+            feature_description = {
+                'steps/observation/image': tf.io.FixedLenSequenceFeature([], tf.string, allow_missing=True),
+                'steps/observation/state': tf.io.FixedLenSequenceFeature([7], tf.float32, allow_missing=True),
+                'steps/action/world_vector': tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
+                'steps/action/rotation_delta': tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
+                'steps/action/open_gripper': tf.io.FixedLenSequenceFeature([1], tf.int64, allow_missing=True),
+            }
+            
+            parsed = tf.io.parse_single_example(example_proto, feature_description)
+            
+            def decode_img(img_str):
+                img = tf.io.decode_image(img_str, channels=3, expand_animations=False)
+                img = tf.image.resize(img, [256, 256])
+                return img / 255.0
+                
+            images = tf.map_fn(decode_img, parsed['steps/observation/image'], fn_output_signature=tf.float32)
+            
+            world_vec = parsed['steps/action/world_vector']
+            rot_delta = parsed['steps/action/rotation_delta']
+            gripper = tf.cast(parsed['steps/action/open_gripper'], tf.float32)
+            action = tf.concat([world_vec, rot_delta, gripper], axis=-1)
+            
+            state = parsed['steps/observation/state']
+            
+            return images, state, action
 
-        # Flat map episodes into a continuous stream of steps
-        step_ds = dataset.flat_map(lambda episode: episode['steps'].map(process_step))
+        # Map the parsing function
+        parsed_dataset = raw_dataset.map(_parse_function, num_parallel_calls=tf.data.AUTOTUNE)
+        
+        # Unbatch to flatten the sequence of steps into a flat dataset of steps
+        step_ds = parsed_dataset.unbatch()
         
         # Create sliding windows of size seq_len
         window_ds = step_ds.window(self.seq_len, shift=1, drop_remainder=True)
@@ -82,6 +110,7 @@ class BridgeDataLoader(BaseRobotDataset):
         
         # Batch the windows
         batched_ds = window_ds.batch(self.batch_size, drop_remainder=True)
+        batched_ds = batched_ds.prefetch(tf.data.AUTOTUNE)
         
         if self.limit:
             batched_ds = batched_ds.take(self.limit)

@@ -37,23 +37,44 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     lr = config["learning_rate"]
     tau = config["tau"]
     
-    encoder_def = ViTEncoder(latent_dim=latent_dim, depth=vit_depth, num_heads=num_heads)
-    predictor_def = JEPAPredictor(latent_dim=latent_dim)
-    wm_def = ActionConditionedTransformer(latent_dim=latent_dim, depth=wm_depth, num_heads=num_heads)
+    # New extracted hyperparameters
+    patch_size = config.get("patch_size", 16)
+    use_masking = config.get("use_masking", True)
+    masking_ratio = config.get("masking_ratio", 0.7) if use_masking else 0.0
+    activation_fn = config.get("activation_fn", "gelu")
+    weight_decay = config.get("weight_decay", 1e-4)
+    batch_size = config.get("batch_size", 32)
+    seq_len = config.get("seq_len", 5)
+    loss_alpha = config.get("loss_alpha", 1.0)
     
-    # Mock inputs for initialization (Batch=32, SeqLen-1=4 for World Model)
+    encoder_def = ViTEncoder(
+        latent_dim=latent_dim, depth=vit_depth, num_heads=num_heads, 
+        patch_size=patch_size, activation_fn=activation_fn, 
+        use_masking=use_masking, masking_ratio=masking_ratio
+    )
+    predictor_def = JEPAPredictor(
+        latent_dim=latent_dim, activation_fn=activation_fn
+    )
+    wm_def = ActionConditionedTransformer(
+        latent_dim=latent_dim, depth=wm_depth, num_heads=num_heads, 
+        activation_fn=activation_fn
+    )
+    
+    # Mock inputs for initialization (Batch=batch_size, SeqLen-1 for World Model)
     mock_img = jnp.ones((1, 256, 256, 3))
-    mock_seq_latents = jnp.ones((32, 4, latent_dim))
-    mock_seq_actions = jnp.ones((32, 4, 7))
+    mock_seq_latents = jnp.ones((batch_size, seq_len - 1, latent_dim))
+    mock_seq_actions = jnp.ones((batch_size, seq_len - 1, 7))
+    
+    init_rngs = {'params': init_rng, 'dropout': init_rng}
     
     # Initialize parameters
-    encoder_params = encoder_def.init(init_rng, mock_img)
-    target_params = encoder_def.init(init_rng, mock_img) # Clone structure
+    encoder_params = encoder_def.init(init_rngs, mock_img, train=False)
+    target_params = encoder_def.init(init_rngs, mock_img, train=False) # Clone structure
     predictor_params = predictor_def.init(init_rng, jnp.ones((1, latent_dim)))
     wm_params = wm_def.init(init_rng, mock_seq_latents, mock_seq_actions)
     
     # 3. Setup Optax Optimizer
-    optimizer = optax.adamw(learning_rate=lr)
+    optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
     
     params_tuple = (encoder_params, predictor_params, wm_params)
     opt_state = optimizer.init(params_tuple)
@@ -64,16 +85,14 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
         "predictor_params": predictor_params,
         "wm_params": wm_params,
         "target_params": target_params,
-        "opt_state": opt_state
+        "opt_state": opt_state,
+        "rng": rng
     }
     
     # 4. Compile JAX Train Step
-    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, optimizer)
+    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, optimizer, loss_alpha)
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)
-    batch_size = 32
-    seq_len = 5
-    
     # If SMAC is running, we stratify a 10% slice to ensure sweeps complete quickly.
     # Otherwise, we use 100% of the dataset for the final multi-day training.
     sample_fraction = 0.10 if config.get("is_smac_run", False) else 1.0
@@ -84,7 +103,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     final_loss = 0.0
     
     # 6. Execute Alternating Training Loop
-    print(f"\\nStarting Training Run (Latent: {latent_dim}, Epochs: {num_epochs})...")
+    print(f"\\nStarting Training Run (Latent: {latent_dim}, Epochs: {num_epochs}, Patch: {patch_size}, Masking: {use_masking})...")
     for epoch in range(num_epochs):
         bridge_iter = bridge_loader.load()
         so100_iter = so100_loader.load()

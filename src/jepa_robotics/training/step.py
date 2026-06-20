@@ -3,12 +3,12 @@ import jax.numpy as jnp
 import optax
 from typing import Dict, Any, Tuple
 
-def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
+def create_train_step(encoder_def, predictor_def, world_model_def, optimizer, loss_alpha: float = 1.0):
     """
     Returns a JIT-compiled training step function bounded to the model definitions.
     """
     
-    def loss_fn(encoder_params, predictor_params, wm_params, target_params, batch: Dict[str, jnp.ndarray]):
+    def loss_fn(encoder_params, predictor_params, wm_params, target_params, batch: Dict[str, jnp.ndarray], rng: jax.Array):
         images = batch["image"]           # (B, S, H, W, C)
         actions = batch["action_7d"]      # (B, S, DoF)
         
@@ -17,11 +17,13 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
         flat_images = images.reshape((b * s, h, w, c))
         
         # Context Encoder (E_x)
-        context_latents = encoder_def.apply(encoder_params, flat_images)
+        # We must provide a dropout rng for the random patch masking
+        rng, dropout_rng = jax.random.split(rng)
+        context_latents = encoder_def.apply(encoder_params, flat_images, train=True, rngs={'dropout': dropout_rng})
         context_latents = context_latents.reshape((b, s, -1))
         
-        # Target Encoder (E_y) - Stop gradient
-        target_latents = encoder_def.apply(target_params, flat_images)
+        # Target Encoder (E_y) - Stop gradient, no dropout (train=False)
+        target_latents = encoder_def.apply(target_params, flat_images, train=False)
         target_latents = jax.lax.stop_gradient(target_latents)
         target_latents = target_latents.reshape((b, s, -1))
         
@@ -42,7 +44,7 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
         temporal_loss = jnp.mean((predicted_next_states - target_latents[:, 1:, :]) ** 2)
         
         # 3. Total Loss
-        total_loss = latent_loss + temporal_loss
+        total_loss = latent_loss + loss_alpha * temporal_loss
         
         metrics = {
             "loss": total_loss,
@@ -63,11 +65,14 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
         wm_params = state["wm_params"]
         target_params = state["target_params"]
         opt_state = state["opt_state"]
+        rng = state["rng"]
+        
+        rng, step_rng = jax.random.split(rng)
 
         # Calculate gradients
         grad_fn = jax.value_and_grad(loss_fn, argnums=(0, 1, 2), has_aux=True)
         (loss, metrics), grads = grad_fn(
-            encoder_params, predictor_params, wm_params, target_params, batch
+            encoder_params, predictor_params, wm_params, target_params, batch, step_rng
         )
         encoder_grads, predictor_grads, wm_grads = grads
         
@@ -91,7 +96,8 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer):
             "predictor_params": new_predictor_params,
             "wm_params": new_wm_params,
             "target_params": new_target_params,
-            "opt_state": new_opt_state
+            "opt_state": new_opt_state,
+            "rng": rng
         }
         
         return new_state, metrics
