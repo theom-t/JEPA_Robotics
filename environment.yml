@@ -27,3 +27,4 @@ dependencies:
     - lerobot    # Hugging Face lerobot library for dataset streaming
     - pytest
     - pytest-cov
+    - smac       # SMAC3 for hierarchical hyperparameter optimization

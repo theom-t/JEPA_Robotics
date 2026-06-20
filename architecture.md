@@ -15,13 +15,20 @@ This document tracks the high-level software architecture for the Cross-Embodime
 *   **Core Function:** Maps arbitrary Degrees of Freedom (DoF) to a unified **7D Cartesian State Space** `[X, Y, Z, Roll, Pitch, Yaw, Gripper_State]`.
 *   **Technology:** JAX-accelerated matrix multiplications (Forward Kinematics based on Denavit-Hartenberg parameters).
 
-## 3. Perception Engine (V-JEPA) - *Planned*
+## 3. Perception Engine (V-JEPA)
 *   **Goal:** Compress raw pixel data into a dense, informative latent space without relying heavily on reconstruction.
-*   **Architecture:** Vision Transformer (ViT).
+*   **Architecture:** Vision Transformer (ViT) implemented via `flax.linen`.
 *   **Target:** Highly modular so the encoder can be frozen, quantized, and deployed to edge hardware (Jetson Orin Nano) independently of the World Model.
+*   **Hyperparameter Initialization:** The latent dimension and network depth are parameterized and discovered dynamically by the SMAC3 optimization loop.
 
-## 4. Latent World Model - *Planned*
+## 4. Latent World Model
 *   **Goal:** Predict future states and plan actions entirely within the latent space derived by the V-JEPA encoder, conditioned on the 7D Cartesian action space.
+*   **Architecture:** Action-Conditioned Transformer. Utilizing causal multi-head self-attention, it predicts $\hat{s}_{t+1}$ using a temporal sequence of historical latents and actions.
+*   **Hyperparameter Initialization:** Transformer layers and attention heads are parameterized for SMAC3 optimization.
+
+## 5. Hyperparameter Optimization (SMAC3)
+*   **Goal:** Navigate the highly complex, hierarchical search space of our dual-engine architecture.
+*   **Validation Pareto Front:** SMAC3 continuously balances the models against a dual-objective metric: minimizing Latent/Temporal loss while simultaneously minimizing Forward Pass Latency to ensure it meets edge robotics bounds (30Hz+).
 
 ## 5. Hardware & Environment
 *   **Training:** Local NVIDIA RTX 5090 (Blackwell architecture). Requires JAX `0.6.2` via `pip` (CUDA 12.8 compatible).
