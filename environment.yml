@@ -1,0 +1,20 @@
+name: jepa_robotics
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - pyarrow      # Required for parquet dataset handling
+  - h5py
+  - opencv       # For video/image processing
+  - tqdm
+  - pyyaml
+  - wandb        # For logging metrics
+  - pip:
+    # RTX 5090 Blackwell Support - using nightlies, no conda CUDA packages
+    # (Install your chosen framework here, e.g. tf-nightly or JAX)
+    - einops     # Essential for transformer/JEPA tensor manipulations
+    - lerobot    # Hugging Face lerobot library for dataset streaming
