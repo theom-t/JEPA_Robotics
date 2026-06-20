@@ -3,12 +3,12 @@ import jax.numpy as jnp
 import optax
 from typing import Dict, Any, Tuple
 
-def create_train_step(encoder_def, predictor_def, world_model_def, optimizer, loss_alpha: float = 1.0):
+def create_train_step(encoder_def, predictor_def, world_model_def, probe_def, optimizer, loss_alpha: float = 1.0):
     """
     Returns a JIT-compiled training step function bounded to the model definitions.
     """
     
-    def loss_fn(encoder_params, predictor_params, wm_params, target_params, batch: Dict[str, jnp.ndarray], rng: jax.Array):
+    def loss_fn(encoder_params, predictor_params, wm_params, probe_params, target_params, batch: Dict[str, jnp.ndarray], rng: jax.Array):
         images = batch["image"]           # (B, S, H, W, C)
         actions = batch["action_7d"]      # (B, S, DoF)
         
@@ -43,13 +43,20 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer, lo
         # Compare against target latents at t=1 to t=S-1
         temporal_loss = jnp.mean((predicted_next_states - target_latents[:, 1:, :]) ** 2)
         
-        # 3. Total Loss
-        total_loss = latent_loss + loss_alpha * temporal_loss
+        # 3. Auxiliary Linear Probe (Interpretable Metric)
+        sg_latents = jax.lax.stop_gradient(context_latents)
+        predicted_states = probe_def.apply(probe_params, sg_latents)
+        state_targets = batch["state_7d"]
+        probe_loss = jnp.mean((predicted_states - state_targets) ** 2)
+        
+        # 4. Total Loss for Optimizer
+        total_loss = latent_loss + loss_alpha * temporal_loss + probe_loss
         
         metrics = {
-            "loss": total_loss,
+            "loss": latent_loss + loss_alpha * temporal_loss,  # Only log the physics loss to the UI
             "latent_l2_loss": latent_loss,
-            "temporal_dynamics_loss": temporal_loss
+            "temporal_dynamics_loss": temporal_loss,
+            "probe_loss": probe_loss
         }
         
         return total_loss, metrics
@@ -63,6 +70,7 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer, lo
         encoder_params = state["encoder_params"]
         predictor_params = state["predictor_params"]
         wm_params = state["wm_params"]
+        probe_params = state["probe_params"]
         target_params = state["target_params"]
         opt_state = state["opt_state"]
         rng = state["rng"]
@@ -70,21 +78,21 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer, lo
         rng, step_rng = jax.random.split(rng)
 
         # Calculate gradients
-        grad_fn = jax.value_and_grad(loss_fn, argnums=(0, 1, 2), has_aux=True)
+        grad_fn = jax.value_and_grad(loss_fn, argnums=(0, 1, 2, 3), has_aux=True)
         (loss, metrics), grads = grad_fn(
-            encoder_params, predictor_params, wm_params, target_params, batch, step_rng
+            encoder_params, predictor_params, wm_params, probe_params, target_params, batch, step_rng
         )
-        encoder_grads, predictor_grads, wm_grads = grads
+        encoder_grads, predictor_grads, wm_grads, probe_grads = grads
         
         # Combine parameters and gradients into a flat structure for optax
-        params_tuple = (encoder_params, predictor_params, wm_params)
-        grads_tuple = (encoder_grads, predictor_grads, wm_grads)
+        params_tuple = (encoder_params, predictor_params, wm_params, probe_params)
+        grads_tuple = (encoder_grads, predictor_grads, wm_grads, probe_grads)
         
         # Apply gradients
         updates, new_opt_state = optimizer.update(grads_tuple, opt_state, params_tuple)
         new_params_tuple = optax.apply_updates(params_tuple, updates)
         
-        new_encoder_params, new_predictor_params, new_wm_params = new_params_tuple
+        new_encoder_params, new_predictor_params, new_wm_params, new_probe_params = new_params_tuple
         
         # Update Target Encoder via EMA
         from jepa_robotics.training.ema import update_target_ema
@@ -95,6 +103,7 @@ def create_train_step(encoder_def, predictor_def, world_model_def, optimizer, lo
             "encoder_params": new_encoder_params,
             "predictor_params": new_predictor_params,
             "wm_params": new_wm_params,
+            "probe_params": new_probe_params,
             "target_params": new_target_params,
             "opt_state": new_opt_state,
             "rng": rng

@@ -104,3 +104,14 @@ class JEPAPredictor(nn.Module):
             y = nn.Dense(self.latent_dim)(y)
             x = x + y
         return x
+
+class StateLinearProbe(nn.Module):
+    """
+    Auxiliary linear probe to regress 7D physical robot state from abstract latent representations.
+    This provides an interpretable metric without affecting the self-supervised encoder (via stop-gradient).
+    """
+    out_dim: int = 7
+    
+    @nn.compact
+    def __call__(self, latents):
+        return nn.Dense(self.out_dim)(latents)

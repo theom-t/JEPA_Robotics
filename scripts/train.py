@@ -28,7 +28,7 @@ def run_single_mode():
         "disable_wandb": True # Disable logging for simple tests, switch to False for real telemetry
     }
     print("Running in SINGLE mode. Using default hyperparameter config.")
-    final_loss = train_model(config, num_epochs=2)
+    final_loss = train_model(config, num_epochs=10)
     print(f"\\nSingle run completed. Final Loss: {final_loss:.4f}")
 
 def run_optimize_mode():

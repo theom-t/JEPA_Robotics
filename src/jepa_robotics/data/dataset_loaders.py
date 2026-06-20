@@ -172,6 +172,7 @@ class SO100DataLoader(BaseRobotDataset):
             
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (256, 256))
+            frame_rgb = frame_rgb.astype(np.float32) / 255.0
             
             window_imgs.append(frame_rgb)
             window_states.append(row["observation.state"])

@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from typing import Dict, Any
 
-from jepa_robotics.models.v_jepa import ViTEncoder, JEPAPredictor
+from jepa_robotics.models.v_jepa import ViTEncoder, JEPAPredictor, StateLinearProbe
 from jepa_robotics.models.world_model import ActionConditionedTransformer
 from jepa_robotics.training.step import create_train_step
 from jepa_robotics.data.dataset_loaders import BridgeDataLoader, SO100DataLoader
@@ -51,6 +51,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
         latent_dim=latent_dim, depth=wm_depth, num_heads=num_heads, 
         activation_fn=activation_fn
     )
+    probe_def = StateLinearProbe(out_dim=7)
     
     # Mock inputs for initialization (Batch=batch_size, SeqLen-1 for World Model)
     mock_img = jnp.ones((1, 256, 256, 3))
@@ -64,11 +65,12 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
     target_params = encoder_def.init(init_rngs, mock_img, train=False) # Clone structure
     predictor_params = predictor_def.init(init_rng, jnp.ones((1, latent_dim)))
     wm_params = wm_def.init(init_rng, mock_seq_latents, mock_seq_actions)
+    probe_params = probe_def.init(init_rng, jnp.ones((1, latent_dim)))
     
     # 3. Setup Optax Optimizer
     optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
     
-    params_tuple = (encoder_params, predictor_params, wm_params)
+    params_tuple = (encoder_params, predictor_params, wm_params, probe_params)
     opt_state = optimizer.init(params_tuple)
     
     # Pack into state dictionary
@@ -76,13 +78,14 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
         "encoder_params": encoder_params,
         "predictor_params": predictor_params,
         "wm_params": wm_params,
+        "probe_params": probe_params,
         "target_params": target_params,
         "opt_state": opt_state,
         "rng": rng
     }
     
     # 4. Compile JAX Train Step
-    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, optimizer, loss_alpha)
+    train_step_fn = create_train_step(encoder_def, predictor_def, wm_def, probe_def, optimizer, loss_alpha)
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)
     # If SMAC is running, we stratify a 10% slice to ensure sweeps complete quickly.
@@ -115,10 +118,12 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1) -> float:
             epoch_losses.append(avg_loss)
             
             # Log telemetry locally via tqdm instead of spamming print statements
+            avg_probe_mse = (metrics_b["probe_loss"] + metrics_s["probe_loss"]) / 2.0
             pbar.set_postfix({
                 "Bridge L": f"{metrics_b['loss']:.3f}", 
                 "SO100 L": f"{metrics_s['loss']:.3f}", 
-                "Avg L": f"{avg_loss:.3f}"
+                "Avg L": f"{avg_loss:.3f}",
+                "Probe MSE": f"{avg_probe_mse:.3f}"
             })
             
         final_loss = np.mean(epoch_losses)
