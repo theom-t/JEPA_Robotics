@@ -1,93 +1,64 @@
-Epoch 1/10: 342batch [01:17,  7.01batch/s, Bridge L=0.003, SO100 L=0.002, Avg L=0.003, Probe MSE=1.172]2026-06-20 23:17:10.558404: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 1/10: 1291batch [03:32,  6.07batch/s, Bridge L=0.212, SO100 L=0.016, Avg L=0.114, Probe MSE=0.858]
-\n✅ Epoch 1 Train Completed - Avg Loss: 0.0148\n
-Epoch 1 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-2026-06-20 23:19:27.508296: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
-2026-06-20 23:19:27.508320: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
-2026-06-20 23:19:27.508327: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
-Epoch 1 Validation: 143batch [00:25,  5.61batch/s, Val Avg L=0.028, Val Probe MSE=0.870]
-\n🎯 Epoch 1 Validation Completed - Val Avg Loss: 0.0453 | Val Probe MSE: 1.0066\n
-Epoch 2/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 2/10: 357batch [00:52,  6.85batch/s, Bridge L=0.056, SO100 L=0.029, Avg L=0.042, Probe MSE=1.300]2026-06-20 23:20:43.198704: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 2/10: 1291batch [03:05,  6.97batch/s, Bridge L=0.173, SO100 L=0.064, Avg L=0.119, Probe MSE=0.742]
-\n✅ Epoch 2 Train Completed - Avg Loss: 0.1961\n
-Epoch 2 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 2 Validation: 143batch [00:18,  7.57batch/s, Val Avg L=0.046, Val Probe MSE=0.843]
-\n🎯 Epoch 2 Validation Completed - Val Avg Loss: 0.2227 | Val Probe MSE: 1.0004\n
-Epoch 3/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 3/10: 357batch [00:52,  6.65batch/s, Bridge L=0.061, SO100 L=0.027, Avg L=0.044, Probe MSE=1.327]2026-06-20 23:24:07.842421: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 3/10: 1291batch [03:05,  6.96batch/s, Bridge L=0.205, SO100 L=0.089, Avg L=0.147, Probe MSE=0.746]
-\n✅ Epoch 3 Train Completed - Avg Loss: 0.3422\n
-Epoch 3 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 3 Validation: 143batch [00:18,  7.69batch/s, Val Avg L=0.040, Val Probe MSE=0.870]
-\n🎯 Epoch 3 Validation Completed - Val Avg Loss: 0.2033 | Val Probe MSE: 0.9940\n
-Epoch 4/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 4/10: 357batch [00:52,  7.53batch/s, Bridge L=0.016, SO100 L=0.027, Avg L=0.021, Probe MSE=1.337]2026-06-20 23:27:31.599877: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 4/10: 1291batch [03:04,  6.99batch/s, Bridge L=0.281, SO100 L=0.075, Avg L=0.178, Probe MSE=0.713]
-\n✅ Epoch 4 Train Completed - Avg Loss: 0.2705\n
-Epoch 4 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 4 Validation: 143batch [00:19,  7.49batch/s, Val Avg L=0.040, Val Probe MSE=0.953]
-\n🎯 Epoch 4 Validation Completed - Val Avg Loss: 0.1645 | Val Probe MSE: 0.9932\n
-Epoch 5/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 5/10: 357batch [00:51,  7.57batch/s, Bridge L=0.017, SO100 L=0.020, Avg L=0.019, Probe MSE=1.324]2026-06-20 23:30:54.792776: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 5/10: 1291batch [03:02,  7.07batch/s, Bridge L=0.191, SO100 L=0.080, Avg L=0.135, Probe MSE=0.705]
-\n✅ Epoch 5 Train Completed - Avg Loss: 0.2308\n
-Epoch 5 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 5 Validation: 143batch [00:18,  7.63batch/s, Val Avg L=0.023, Val Probe MSE=0.894]
-\n🎯 Epoch 5 Validation Completed - Val Avg Loss: 0.2102 | Val Probe MSE: 0.9870\n
-Epoch 6/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 6/10: 357batch [00:52,  6.85batch/s, Bridge L=0.051, SO100 L=0.010, Avg L=0.031, Probe MSE=1.287]2026-06-20 23:34:16.814982: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 6/10: 1291batch [03:04,  6.98batch/s, Bridge L=0.192, SO100 L=0.046, Avg L=0.119, Probe MSE=0.718]
-\n✅ Epoch 6 Train Completed - Avg Loss: 0.2329\n
-Epoch 6 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 6 Validation: 143batch [00:18,  7.65batch/s, Val Avg L=0.099, Val Probe MSE=0.900]
-\n🎯 Epoch 6 Validation Completed - Val Avg Loss: 0.2657 | Val Probe MSE: 0.9760\n
-Epoch 7/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 7/10: 357batch [00:52,  6.60batch/s, Bridge L=0.292, SO100 L=0.022, Avg L=0.157, Probe MSE=1.287]2026-06-20 23:37:40.231168: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 7/10: 1291batch [03:04,  6.98batch/s, Bridge L=0.227, SO100 L=0.069, Avg L=0.148, Probe MSE=0.704]
-\n✅ Epoch 7 Train Completed - Avg Loss: 0.2547\n
-Epoch 7 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 7 Validation: 143batch [00:18,  7.57batch/s, Val Avg L=0.053, Val Probe MSE=0.890]
-\n🎯 Epoch 7 Validation Completed - Val Avg Loss: 0.2374 | Val Probe MSE: 0.9785\n
-Epoch 8/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 8/10: 357batch [00:52,  6.98batch/s, Bridge L=0.139, SO100 L=0.026, Avg L=0.082, Probe MSE=1.272]2026-06-20 23:41:04.308857: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 8/10: 1291batch [03:05,  6.97batch/s, Bridge L=0.315, SO100 L=0.049, Avg L=0.182, Probe MSE=0.703]
-\n✅ Epoch 8 Train Completed - Avg Loss: 0.2432\n
-Epoch 8 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 8 Validation: 143batch [00:18,  7.57batch/s, Val Avg L=0.047, Val Probe MSE=0.897]
-\n🎯 Epoch 8 Validation Completed - Val Avg Loss: 0.1889 | Val Probe MSE: 0.9787\n
-Epoch 9/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 9/10: 357batch [00:53,  6.83batch/s, Bridge L=0.085, SO100 L=0.006, Avg L=0.046, Probe MSE=1.299]2026-06-20 23:44:28.901777: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 9/10: 1291batch [03:06,  6.94batch/s, Bridge L=0.370, SO100 L=0.115, Avg L=0.243, Probe MSE=0.725]
-\n✅ Epoch 9 Train Completed - Avg Loss: 0.2109\n
-Epoch 9 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 9 Validation: 143batch [00:19,  7.47batch/s, Val Avg L=0.116, Val Probe MSE=0.891]
-\n🎯 Epoch 9 Validation Completed - Val Avg Loss: 0.2561 | Val Probe MSE: 0.9873\n
-Epoch 10/10: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-2026-06-20 23:47:01.391423: W tensorflow/core/kernels/data/prefetch_autotuner.cc:52] Prefetch autotuner tried to allocate 62919040 bytes after encountering the first element of size 62919040 bytes.This already causes the autotune ram budget to be exceeded. To stay within the ram budget, either increase the ram budget or reduce element size
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 10/10: 389batch [00:57,  7.12batch/s, Bridge L=0.253, SO100 L=0.013, Avg L=0.133, Probe MSE=0.944]2026-06-20 23:47:58.081119: W tensorflow/core/kernels/data/experimental/ignore_errors_dataset_op.cc:119] Error raised with error message corrupted record at 12
-Epoch 10/10: 1291batch [03:05,  6.96batch/s, Bridge L=0.303, SO100 L=0.041, Avg L=0.172, Probe MSE=0.703]
-\n✅ Epoch 10 Train Completed - Avg Loss: 0.1834\n
-Epoch 10 Validation: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 10 Validation: 143batch [00:20,  6.94batch/s, Val Avg L=0.115, Val Probe MSE=0.908]
-\n🎯 Epoch 10 Validation Completed - Val Avg Loss: 0.2365 | Val Probe MSE: 0.9810\n
-\nSingle run completed. Final Loss: 0.2365
+(jepa_robotics) tmainetucker@tmainetucker-MS-7E61:~/Repos/JEPA_Robotics$ python scripts/train.py --mode optimize --eval
+Running in OPTIMIZE mode via SMAC3.
+[INFO][abstract_initial_design.py:91] Reducing the number of initial configurations from 140 to 12 (max_ratio == 0.25).
+[INFO][abstract_initial_design.py:143] Using 12 initial design configurations and 0 additional configurations.
+[INFO][abstract_intensifier.py:313] Using only one seed for deterministic scenario.
+[INFO][successive_halving.py:164] Successive Halving uses budget type BUDGETS with eta 2, min budget 4, and max budget 10.
+[INFO][successive_halving.py:328] Number of configs in stage:
+[INFO][successive_halving.py:330] --- Bracket 0: [2, 1]
+[INFO][successive_halving.py:330] --- Bracket 1: [2]
+[INFO][successive_halving.py:332] Budgets in stage:
+[INFO][successive_halving.py:334] --- Bracket 0: [5.0, 10.0]
+[INFO][successive_halving.py:334] --- Bracket 1: [10.0]
+
+[SMAC] Evaluating config for 5 epochs (Budget: 5.0)
+INFO:2026-06-21 16:01:46,881:jax._src.xla_bridge:752: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+[INFO][xla_bridge.py:752] Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+2026-06-21 16:01:48.264591: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:48.609397: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:48.961641: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:49.292630: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:49.682908: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:50.195184: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:51.214163: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:51.915612: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:52.275693: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:52.877202: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:53.328935: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:54.040900: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+\nStarting Training Run (Latent: 128, Epochs: 5, Patch: 128, Masking: False)...
+Epoch 1/5: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 0.1)
+Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 0.1)
+[INFO][config.py:112] TensorFlow version 2.19.1 available.
+[INFO][config.py:125] JAX version 0.6.2 available.
+Using the latest cached version of the dataset since lerobot/svla_so100_stacking couldn't be found on the Hugging Face Hub (offline mode is enabled).
+[WARNING][load.py:835] Using the latest cached version of the dataset since lerobot/svla_so100_stacking couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100/lerobot___svla_so100_stacking/default/0.0.0/476c6810591b5e75b385d6e8d9c648525a153eb9 (last modified on Sat Jun 20 23:19:26 2026).
+[WARNING][cache.py:95] Found the latest cached dataset configuration 'default' at /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100/lerobot___svla_so100_stacking/default/0.0.0/476c6810591b5e75b385d6e8d9c648525a153eb9 (last modified on Sat Jun 20 23:19:26 2026).
+2026-06-21 16:01:58.154191: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154218: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154251: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154259: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154263: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154267: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154272: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154294: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154299: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154319: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154323: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154327: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154330: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154334: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154340: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154343: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154416: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154424: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154428: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154436: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154444: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154514: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154550: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154574: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154583: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+2026-06-21 16:01:58.154588: W external/xla/xla/service/gpu/autotuning/dot_search_space.cc:200] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs?Working around this by using the full hints set instead.
+Epoch 1/5: 105batch [00:40,  6.96batch/s, Bridge L=0.778, SO100 L=0.739, Avg L=0.758, Probe MSE=2.398] 

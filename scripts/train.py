@@ -2,6 +2,10 @@ import argparse
 import sys
 import os
 
+# Suppress XLA C++ warnings and prevent JAX from searching for TPUs
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["JAX_PLATFORMS"] = "cuda,cpu"
+
 # Add src to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 

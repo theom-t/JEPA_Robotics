@@ -103,11 +103,19 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     
     # 6. Execute Alternating Training Loop
     print(f"\\nStarting Training Run (Latent: {latent_dim}, Epochs: {num_epochs}, Patch: {patch_size}, Masking: {use_masking})...")
+    
+    def cycle_loader(loader, split):
+        """Yields batches continuously by restarting the loader when it hits StopIteration."""
+        while True:
+            for batch in loader.load(split=split):
+                yield batch
+
     for epoch in range(num_epochs):
-        bridge_iter = bridge_loader.load()
-        so100_iter = so100_loader.load()
+        bridge_iter = bridge_loader.load(split="train")
+        so100_iter = cycle_loader(so100_loader, split="train")
         
-        # We zip them to alternate batches cleanly
+        # We zip them. Since so100_iter is infinite, the zip will naturally terminate 
+        # when the massive bridge_iter is finally exhausted!
         epoch_losses = []
         pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch")
         for bridge_batch, so100_batch in pbar:
@@ -138,7 +146,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             val_probe_mses = []
             
             bridge_val_iter = bridge_val_loader.load(split="val")
-            so100_val_iter = so100_val_loader.load(split="val")
+            so100_val_iter = cycle_loader(so100_val_loader, split="val")
             
             pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch")
             for bridge_val_batch, so100_val_batch in pbar_val:

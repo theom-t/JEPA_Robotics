@@ -50,7 +50,9 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
         deterministic=True, # JAX PRNG keys make evaluation deterministic
         n_trials=50,       # Number of architectures to evaluate
         name=run_name,
-        output_directory="smac3_output" # Explicitly force the automatic JSON save behavior
+        output_directory="smac3_output", # Explicitly force the automatic JSON save behavior
+        min_budget=4,      # Multi-fidelity min epochs
+        max_budget=10      # Multi-fidelity max epochs
     )
     
     return scenario
@@ -58,9 +60,11 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
 from ConfigSpace import Configuration
 
 def get_evaluation_function(do_eval: bool):
-    def evaluation_function(config: Configuration, seed: int = 0) -> float:
+    # Notice we now accept `budget` from SMAC for multi-fidelity tuning
+    def evaluation_function(config: Configuration, seed: int = 0, budget: float = 10.0) -> float:
         """
         The function SMAC calls to evaluate a given architecture.
+        The 'budget' parameter tells us how many epochs to train for this specific trial.
         """
         from jepa_robotics.training.loop import train_model
         
@@ -68,18 +72,32 @@ def get_evaluation_function(do_eval: bool):
         config_dict = dict(config)
         config_dict["is_smac_run"] = True
         
-        loss = train_model(config_dict, num_epochs=2, do_eval=do_eval)
+        # Train for the number of epochs specified by the Hyperband budget
+        epochs_to_run = int(budget)
+        print(f"\n[SMAC] Evaluating config for {epochs_to_run} epochs (Budget: {budget})")
+        
+        loss = train_model(config_dict, num_epochs=epochs_to_run, do_eval=do_eval)
         return float(loss)
     return evaluation_function
 
 def run_smac_optimization(do_eval: bool = True):
-    """Executes the SMAC3 optimization loop."""
+    """Executes the SMAC3 optimization loop with Hyperband."""
+    from smac.intensifier.hyperband import Hyperband
+    
     scenario = build_smac_scenario()
+    
+    # Enable Multi-Fidelity Hyperband Intensifier
+    intensifier = Hyperband(
+        scenario,
+        incumbent_selection="highest_observed_budget",
+        eta=2           # Changed to 2 so it halving perfectly (4 -> 8 -> 10)
+    )
     
     # Use the Facade for standard Hyperparameter Optimization
     smac = HyperparameterOptimizationFacade(
         scenario, 
-        get_evaluation_function(do_eval)
+        get_evaluation_function(do_eval),
+        intensifier=intensifier
     )
     
     incumbent = smac.optimize()
