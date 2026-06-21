@@ -18,14 +18,15 @@ def visualize_batch(loader, dataset_name: str):
         except StopIteration:
             break
             
-        # The image is expected to be [B, H, W, C]
-        img = np.array(batch["image"][0])
+        # The image is expected to be [B, S, H, W, C] due to the temporal sliding window
+        # We grab the first batch item (0), and the first frame in the sequence (0)
+        img = np.array(batch["image"][0, 0])
         axes[i].imshow(img)
         axes[i].set_title(f"Frame {i}")
         
         cartesian = batch.get("state_7d", None)
         if cartesian is not None:
-            xyz = cartesian[0][:3]
+            xyz = cartesian[0, 0][:3]
             axes[i].text(10, 20, f"X:{xyz[0]:.2f} Y:{xyz[1]:.2f} Z:{xyz[2]:.2f}", 
                         color='white', backgroundcolor='black')
         

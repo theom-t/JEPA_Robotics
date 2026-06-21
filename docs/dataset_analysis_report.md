@@ -8,13 +8,13 @@ This report provides an in-depth breakdown of the robotic datasets currently ava
 #### Split: `TRAIN`
 - **Total Episodes Recorded:** 25,460
 - **Total Disk Size (100%):** 340.85 GB
-- **Current Shards Downloaded:** 105 out of 1024 (10.3%)
-- **Estimated Frames Available Locally:** ~91,372 frames
+- **Current Shards Downloaded:** 1024 out of 1024 (100.0%)
+- **Estimated Frames Available Locally:** ~891,100 frames
 #### Split: `TEST`
 - **Total Episodes Recorded:** 3,475
 - **Total Disk Size (100%):** 46.65 GB
-- **Current Shards Downloaded:** 485 out of 512 (94.7%)
-- **Estimated Frames Available Locally:** ~115,211 frames
+- **Current Shards Downloaded:** 512 out of 512 (100.0%)
+- **Estimated Frames Available Locally:** ~121,625 frames
 ### 1.2 Schema & Feature Space
 #### Observation Subspace:
 - `image`: Camera feed. Shape: `(480, 640, 3)`. Dtype: `uint8`.

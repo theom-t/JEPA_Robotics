@@ -136,13 +136,18 @@ class SO100DataLoader(BaseRobotDataset):
         self.sample_fraction = sample_fraction
 
     def load(self, split: str = "train") -> Iterator[Dict[str, Any]]:
-        from datasets import load_dataset
+        import os
         import cv2
         
         print(f"Loading REAL LeRobot SO100 Data OFFLINE from {self.offline_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
         
+        # Force Hugging Face into strictly offline mode to prevent HTTP requests
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        
+        from datasets import load_dataset
+        
         # Load the states/actions metadata (Parquet) strictly from the offline cache
-        # Note: If it's cached, HF automatically loads offline.
         dataset = load_dataset(self.hf_repo, split="train", cache_dir=self.offline_dir)
         
         # Hard 90/10 split to ensure completely disjoint subsets for train/val
