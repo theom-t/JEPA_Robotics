@@ -58,22 +58,53 @@ def compute_kinematics_chain(joint_angles: jax.Array, dh_params: list) -> jax.Ar
         
     return T_final
 
-def extract_xyz_rpy(T: jax.Array) -> jax.Array:
-    """Extracts (X, Y, Z, Roll, Pitch, Yaw) from batch of 4x4 matrices."""
+def extract_xyz_6d(T: jax.Array) -> jax.Array:
+    """Extracts (X, Y, Z, 6D Rotation) from batch of 4x4 matrices."""
     x = T[:, 0, 3]
     y = T[:, 1, 3]
     z = T[:, 2, 3]
     
-    pitch = jnp.arcsin(jnp.clip(-T[:, 2, 0], -1.0, 1.0))
-    roll = jnp.arctan2(T[:, 2, 1], T[:, 2, 2])
-    yaw = jnp.arctan2(T[:, 1, 0], T[:, 0, 0])
+    # 6D continuous rotation uses the first two columns of the rotation matrix
+    col1_x = T[:, 0, 0]
+    col1_y = T[:, 1, 0]
+    col1_z = T[:, 2, 0]
     
-    return jnp.stack([x, y, z, roll, pitch, yaw], axis=-1)
+    col2_x = T[:, 0, 1]
+    col2_y = T[:, 1, 1]
+    col2_z = T[:, 2, 1]
+    
+    return jnp.stack([x, y, z, col1_x, col1_y, col1_z, col2_x, col2_y, col2_z], axis=-1)
+
+def rpy_to_6d(rpy: jax.Array) -> jax.Array:
+    """Converts (Roll, Pitch, Yaw) Euler angles to 6D continuous rotation."""
+    r = rpy[..., 0]
+    p = rpy[..., 1]
+    y = rpy[..., 2]
+    
+    cos_r = jnp.cos(r)
+    sin_r = jnp.sin(r)
+    cos_p = jnp.cos(p)
+    sin_p = jnp.sin(p)
+    cos_y = jnp.cos(y)
+    sin_y = jnp.sin(y)
+    
+    r00 = cos_p * cos_y
+    r10 = cos_p * sin_y
+    r20 = -sin_p
+    
+    r01 = sin_r * sin_p * cos_y - cos_r * sin_y
+    r11 = sin_r * sin_p * sin_y + cos_r * cos_y
+    r21 = sin_r * cos_p
+    
+    col1 = jnp.stack([r00, r10, r20], axis=-1)
+    col2 = jnp.stack([r01, r11, r21], axis=-1)
+    
+    return jnp.concatenate([col1, col2], axis=-1)
 
 def forward_kinematics(joint_angles: jax.Array, robot_type: str) -> jax.Array:
     """
-    Transforms joint angles into 7D Cartesian space using DH parameters.
-    Returns: (Batch, 7) [X, Y, Z, roll, pitch, yaw, gripper_state]
+    Transforms joint angles into 10D Cartesian space using DH parameters.
+    Returns: (Batch, 10) [X, Y, Z, r1, r2, r3, r4, r5, r6, gripper_state]
     """
     gripper_state = joint_angles[:, -1:]
     
@@ -97,12 +128,12 @@ def forward_kinematics(joint_angles: jax.Array, robot_type: str) -> jax.Array:
         ]
         
     T_final = compute_kinematics_chain(joint_angles, dh_table)
-    xyz_rpy = extract_xyz_rpy(T_final)
+    xyz_6d = extract_xyz_6d(T_final)
     
     if robot_type == "so100":
         # SO100 gripper is a raw motor degree, squash it so it matches BridgeData [0, 1] range
         gripper_state = jnp.tanh(gripper_state / 100.0)
         
-    cartesian_7d = jnp.concatenate([xyz_rpy, gripper_state], axis=1)
+    cartesian_10d = jnp.concatenate([xyz_6d, gripper_state], axis=1)
     
-    return cartesian_7d
+    return cartesian_10d

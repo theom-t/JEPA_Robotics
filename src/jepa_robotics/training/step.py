@@ -9,8 +9,10 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, core_op
     """
     
     def loss_fn(encoder_params, predictor_params, wm_params, probe_params, target_params, batch: Dict[str, jnp.ndarray], rng: jax.Array):
-        images = batch["image"]           # (B, S, H, W, C)
-        actions = batch["action_7d"]      # (B, S, DoF)
+        # Cleanse potential NaNs from corrupted dataset frames (common in raw robotic telemetry)
+        images = jnp.nan_to_num(batch["image"])           # (B, S, H, W, C)
+        actions = jnp.nan_to_num(batch["action_10d"])      # (B, S, 10)
+        state_targets = jnp.nan_to_num(batch["state_10d"])
         
         # 1. Perception Forward Pass
         b, s, h, w, c = images.shape
@@ -46,14 +48,19 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, core_op
         # 3. Auxiliary Linear Probe (Interpretable Metric)
         sg_latents = jax.lax.stop_gradient(context_latents)
         predicted_states = probe_def.apply(probe_params, sg_latents)
-        state_targets = batch["state_7d"]
         
-        pos_mse = jnp.mean((predicted_states[..., :3] - state_targets[..., :3]) ** 2)
-        rot_mse = jnp.mean((predicted_states[..., 3:6] - state_targets[..., 3:6]) ** 2)
-        grip_mse = jnp.mean((predicted_states[..., 6:] - state_targets[..., 6:]) ** 2)
+        pos_diff = predicted_states[..., :3] - state_targets[..., :3]
+        rot_diff = predicted_states[..., 3:9] - state_targets[..., 3:9]
+        grip_diff = predicted_states[..., 9:] - state_targets[..., 9:]
         
-        # We still use mean MSE to optimize the probe's weights, as it's just a linear layer.
-        probe_loss = jnp.mean((predicted_states - state_targets) ** 2)
+        # 6D rotation represents exact continuous matrices; a standard MSE gracefully computes exact alignment!
+        pos_mse = jnp.mean(pos_diff ** 2)
+        rot_mse = jnp.mean(rot_diff ** 2)
+        grip_mse = jnp.mean(grip_diff ** 2)
+        
+        # Probe loss trains on all 10 dimensions equally
+        wrapped_diffs = jnp.concatenate([pos_diff, rot_diff, grip_diff], axis=-1)
+        probe_loss = jnp.mean(wrapped_diffs ** 2)
         
         # 4. Total Loss for Optimizer
         total_loss = latent_loss + loss_alpha * temporal_loss + probe_loss

@@ -22,21 +22,43 @@ class BaseRobotDataset:
         
     def _apply_kinematics(self, batch: Dict[str, Any], robot_type: str) -> Dict[str, Any]:
         """
-        Passes native joint states through the Kinematic Bridge to standardize output.
+        Standardizes output into 10D Cartesian task space (X, Y, Z, 6D Rot, Gripper).
         """
-        if "joint_states" in batch:
-            # We must apply kinematics over the batch and sequence dimensions: (B, S, DoF)
-            b, s, dof = batch["joint_states"].shape
-            flat_states = batch["joint_states"].reshape(b * s, dof)
-            flat_7d = forward_kinematics(flat_states, robot_type)
-            batch["state_7d"] = flat_7d.reshape(b, s, 7)
-            
-        if "joint_actions" in batch:
-            b, s, dof = batch["joint_actions"].shape
-            flat_actions = batch["joint_actions"].reshape(b * s, dof)
-            flat_7d = forward_kinematics(flat_actions, robot_type)
-            batch["action_7d"] = flat_7d.reshape(b, s, 7)
-            
+        from jepa_robotics.data.kinematics import rpy_to_6d, forward_kinematics
+        
+        if robot_type == "widowx":
+            # BridgeData V2 is ALREADY recorded in 7D Cartesian space (X,Y,Z, R,P,Y, Gripper).
+            # We bypass DH kinematics and simply convert the raw RPY to 6D rotation!
+            def convert_7d_to_10d(states_7d):
+                b, s, _ = states_7d.shape
+                flat = states_7d.reshape(b * s, 7)
+                xyz = flat[:, :3]
+                rpy = flat[:, 3:6]
+                gripper = flat[:, 6:]
+                rot_6d = rpy_to_6d(rpy)
+                flat_10d = jnp.concatenate([xyz, rot_6d, gripper], axis=-1)
+                return flat_10d.reshape(b, s, 10)
+                
+            if "joint_states" in batch:
+                batch["state_10d"] = convert_7d_to_10d(batch["joint_states"])
+            if "joint_actions" in batch:
+                batch["action_10d"] = convert_7d_to_10d(batch["joint_actions"])
+                
+        else:
+            # SO100 is recorded in native joint-angles. We must pass it through
+            # the Kinematic Bridge to map it to the shared 10D Cartesian space.
+            if "joint_states" in batch:
+                b, s, dof = batch["joint_states"].shape
+                flat_states = batch["joint_states"].reshape(b * s, dof)
+                flat_10d = forward_kinematics(flat_states, robot_type)
+                batch["state_10d"] = flat_10d.reshape(b, s, 10)
+                
+            if "joint_actions" in batch:
+                b, s, dof = batch["joint_actions"].shape
+                flat_actions = batch["joint_actions"].reshape(b * s, dof)
+                flat_10d = forward_kinematics(flat_actions, robot_type)
+                batch["action_10d"] = flat_10d.reshape(b, s, 10)
+                
         return batch
 
 class BridgeDataLoader(BaseRobotDataset):

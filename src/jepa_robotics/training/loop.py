@@ -52,12 +52,12 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         latent_dim=latent_dim, depth=wm_depth, num_heads=num_heads, 
         activation_fn=activation_fn
     )
-    probe_def = StateLinearProbe(out_dim=7)
+    probe_def = StateLinearProbe(out_dim=10)
     
     # Mock inputs for initialization (Batch=batch_size, SeqLen-1 for World Model)
     mock_img = jnp.ones((1, 256, 256, 3))
     mock_seq_latents = jnp.ones((batch_size, seq_len - 1, latent_dim))
-    mock_seq_actions = jnp.ones((batch_size, seq_len - 1, 7))
+    mock_seq_actions = jnp.ones((batch_size, seq_len - 1, 10))
     
     init_rngs = {'params': init_rng, 'dropout': init_rng}
     
@@ -68,9 +68,17 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     wm_params = wm_def.init(init_rng, mock_seq_latents, mock_seq_actions)
     probe_params = probe_def.init(init_rng, jnp.ones((1, latent_dim)))
     
-    # 3. Setup Optax Optimizers (Decoupled)
-    core_optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
-    probe_optimizer = optax.adamw(learning_rate=probe_lr, weight_decay=0.0) # Linear probe usually needs no WD
+    # 3. Setup Optax Optimizers (Decoupled & NaN-Protected)
+    core_optimizer = optax.chain(
+        optax.clip(10.0), # Safe scalar clipping. Global norm squaring can cause float32 'inf' overflows
+        optax.zero_nans(),
+        optax.adamw(learning_rate=lr, weight_decay=weight_decay)
+    )
+    probe_optimizer = optax.chain(
+        optax.clip(10.0),
+        optax.zero_nans(),
+        optax.adamw(learning_rate=probe_lr, weight_decay=0.0)
+    )
     
     core_params_tuple = (encoder_params, predictor_params, wm_params)
     core_opt_state = core_optimizer.init(core_params_tuple)
@@ -197,9 +205,13 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             print(f"\\n🎯 Epoch {epoch+1} Validation Completed - Val Avg Loss: {final_val_loss:.4f} | Pos: {final_val_pos:.4f} | Rot: {final_val_rot:.4f} | Grp: {final_val_grip:.4f} | SMAC Score: {weighted_probe_score:.4f}\\n")
             
             # If evaluating, return the weighted PROBE MSE to SMAC.
-            # The self-supervised L2 loss is prone to 'representation collapse' (reaching 0.0).
-            # The Probe MSE is the only absolute ground-truth of representation quality.
             final_loss = weighted_probe_score
+            
+            # Early stopping: if the loss diverges to NaN, instantly abort the trial
+            # and return a massive penalty so SMAC learns not to use this learning rate
+            if np.isnan(final_loss):
+                print("\n[WARNING] Loss diverged to NaN. Aborting trial early to save compute.\n")
+                return 999.0
             
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)
