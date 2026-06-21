@@ -26,6 +26,7 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
     # --- Temporal & Optimizer Dynamics ---
     tau = Float("tau", (0.99, 0.9999), default=0.996)
     learning_rate = Float("learning_rate", (1e-5, 1e-3), default=1e-4, log=True)
+    probe_learning_rate = Float("probe_learning_rate", (1e-4, 1e-1), default=1e-3, log=True)
     weight_decay = Float("weight_decay", (1e-6, 1e-2), default=1e-4, log=True)
     batch_size = Categorical("batch_size", [8, 16, 32], default=32)
     seq_len = Integer("seq_len", (3, 10), default=5)
@@ -36,7 +37,7 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
         latent_dim, vit_depth, patch_size, 
         use_masking, masking_ratio,
         wm_depth, num_heads, 
-        tau, learning_rate, weight_decay,
+        tau, learning_rate, probe_learning_rate, weight_decay,
         batch_size, seq_len, activation_fn, loss_alpha
     ])
     

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import optax
 from typing import Dict, Any, Tuple
 
-def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimizer, loss_alpha: float = 1.0):
+def create_steps(encoder_def, predictor_def, world_model_def, probe_def, core_optimizer, probe_optimizer, loss_alpha: float = 1.0):
     """
     Returns JIT-compiled train and eval step functions bounded to the model definitions.
     """
@@ -47,6 +47,12 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimiz
         sg_latents = jax.lax.stop_gradient(context_latents)
         predicted_states = probe_def.apply(probe_params, sg_latents)
         state_targets = batch["state_7d"]
+        
+        pos_mse = jnp.mean((predicted_states[..., :3] - state_targets[..., :3]) ** 2)
+        rot_mse = jnp.mean((predicted_states[..., 3:6] - state_targets[..., 3:6]) ** 2)
+        grip_mse = jnp.mean((predicted_states[..., 6:] - state_targets[..., 6:]) ** 2)
+        
+        # We still use mean MSE to optimize the probe's weights, as it's just a linear layer.
         probe_loss = jnp.mean((predicted_states - state_targets) ** 2)
         
         # 4. Total Loss for Optimizer
@@ -56,7 +62,10 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimiz
             "loss": latent_loss + loss_alpha * temporal_loss,  # Only log the physics loss to the UI
             "latent_l2_loss": latent_loss,
             "temporal_dynamics_loss": temporal_loss,
-            "probe_loss": probe_loss
+            "probe_loss": probe_loss,
+            "pos_mse": pos_mse,
+            "rot_mse": rot_mse,
+            "grip_mse": grip_mse
         }
         
         return total_loss, metrics
@@ -72,7 +81,8 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimiz
         wm_params = state["wm_params"]
         probe_params = state["probe_params"]
         target_params = state["target_params"]
-        opt_state = state["opt_state"]
+        core_opt_state = state["core_opt_state"]
+        probe_opt_state = state["probe_opt_state"]
         rng = state["rng"]
         
         rng, step_rng = jax.random.split(rng)
@@ -84,15 +94,17 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimiz
         )
         encoder_grads, predictor_grads, wm_grads, probe_grads = grads
         
-        # Combine parameters and gradients into a flat structure for optax
-        params_tuple = (encoder_params, predictor_params, wm_params, probe_params)
-        grads_tuple = (encoder_grads, predictor_grads, wm_grads, probe_grads)
+        # 1. Update Core Network (ViT + Predictor + World Model)
+        core_params_tuple = (encoder_params, predictor_params, wm_params)
+        core_grads_tuple = (encoder_grads, predictor_grads, wm_grads)
         
-        # Apply gradients
-        updates, new_opt_state = optimizer.update(grads_tuple, opt_state, params_tuple)
-        new_params_tuple = optax.apply_updates(params_tuple, updates)
+        core_updates, new_core_opt_state = core_optimizer.update(core_grads_tuple, core_opt_state, core_params_tuple)
+        new_core_params_tuple = optax.apply_updates(core_params_tuple, core_updates)
+        new_encoder_params, new_predictor_params, new_wm_params = new_core_params_tuple
         
-        new_encoder_params, new_predictor_params, new_wm_params, new_probe_params = new_params_tuple
+        # 2. Update Linear Probe Independently
+        probe_updates, new_probe_opt_state = probe_optimizer.update(probe_grads, probe_opt_state, probe_params)
+        new_probe_params = optax.apply_updates(probe_params, probe_updates)
         
         # Update Target Encoder via EMA
         from jepa_robotics.training.ema import update_target_ema
@@ -105,7 +117,8 @@ def create_steps(encoder_def, predictor_def, world_model_def, probe_def, optimiz
             "wm_params": new_wm_params,
             "probe_params": new_probe_params,
             "target_params": new_target_params,
-            "opt_state": new_opt_state,
+            "core_opt_state": new_core_opt_state,
+            "probe_opt_state": new_probe_opt_state,
             "rng": rng
         }
         

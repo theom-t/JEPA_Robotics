@@ -35,6 +35,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     masking_ratio = config.get("masking_ratio", 0.7) if use_masking else 0.0
     activation_fn = config.get("activation_fn", "gelu")
     weight_decay = config.get("weight_decay", 1e-4)
+    probe_lr = config.get("probe_learning_rate", 1e-3)
     batch_size = config.get("batch_size", 32)
     seq_len = config.get("seq_len", 5)
     loss_alpha = config.get("loss_alpha", 1.0)
@@ -67,11 +68,13 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     wm_params = wm_def.init(init_rng, mock_seq_latents, mock_seq_actions)
     probe_params = probe_def.init(init_rng, jnp.ones((1, latent_dim)))
     
-    # 3. Setup Optax Optimizer
-    optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
+    # 3. Setup Optax Optimizers (Decoupled)
+    core_optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
+    probe_optimizer = optax.adamw(learning_rate=probe_lr, weight_decay=0.0) # Linear probe usually needs no WD
     
-    params_tuple = (encoder_params, predictor_params, wm_params, probe_params)
-    opt_state = optimizer.init(params_tuple)
+    core_params_tuple = (encoder_params, predictor_params, wm_params)
+    core_opt_state = core_optimizer.init(core_params_tuple)
+    probe_opt_state = probe_optimizer.init(probe_params)
     
     # Pack into state dictionary
     state = {
@@ -80,17 +83,22 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         "wm_params": wm_params,
         "probe_params": probe_params,
         "target_params": target_params,
-        "opt_state": opt_state,
+        "core_opt_state": core_opt_state,
+        "probe_opt_state": probe_opt_state,
         "rng": rng
     }
     
     # 4. Compile JAX Train and Eval Steps
-    train_step_fn, eval_step_fn = create_steps(encoder_def, predictor_def, wm_def, probe_def, optimizer, loss_alpha)
+    train_step_fn, eval_step_fn = create_steps(encoder_def, predictor_def, wm_def, probe_def, core_optimizer, probe_optimizer, loss_alpha)
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)
-    # If SMAC is running, we stratify a 10% slice to ensure sweeps complete quickly.
-    # Otherwise, we use 100% of the dataset for the final multi-day training.
-    sample_fraction = 0.10 if config.get("is_smac_run", False) else 1.0
+    is_smac = config.get("is_smac_run", False)
+    # Use 4% of the dataset for SMAC to ensure epochs finish in ~3 minutes
+    sample_fraction = 0.04 if is_smac else 1.0
+    
+    # We also enforce a hard ceiling on batches per epoch during SMAC so it never hangs
+    max_train_batches = 1000 if is_smac else None
+    max_val_batches = 200 if is_smac else None
     
     bridge_loader = BridgeDataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
     so100_loader = SO100DataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
@@ -114,11 +122,12 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         bridge_iter = bridge_loader.load(split="train")
         so100_iter = cycle_loader(so100_loader, split="train")
         
-        # We zip them. Since so100_iter is infinite, the zip will naturally terminate 
-        # when the massive bridge_iter is finally exhausted!
         epoch_losses = []
-        pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch")
-        for bridge_batch, so100_batch in pbar:
+        pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch", total=max_train_batches)
+        
+        for batch_idx, (bridge_batch, so100_batch) in enumerate(pbar):
+            if max_train_batches and batch_idx >= max_train_batches:
+                break
             # Process BridgeData
             state, metrics_b = train_step_fn(state, bridge_batch, tau)
             
@@ -130,12 +139,15 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             epoch_losses.append(avg_loss)
             
             # Log telemetry locally via tqdm instead of spamming print statements
-            avg_probe_mse = (metrics_b["probe_loss"] + metrics_s["probe_loss"]) / 2.0
+            avg_pos_mse = (metrics_b["pos_mse"] + metrics_s["pos_mse"]) / 2.0
+            avg_rot_mse = (metrics_b["rot_mse"] + metrics_s["rot_mse"]) / 2.0
+            avg_grip_mse = (metrics_b["grip_mse"] + metrics_s["grip_mse"]) / 2.0
+            
             pbar.set_postfix({
-                "Bridge L": f"{metrics_b['loss']:.3f}", 
-                "SO100 L": f"{metrics_s['loss']:.3f}", 
                 "Avg L": f"{avg_loss:.3f}",
-                "Probe MSE": f"{avg_probe_mse:.3f}"
+                "Pos": f"{avg_pos_mse:.3f}",
+                "Rot": f"{avg_rot_mse:.3f}",
+                "Grp": f"{avg_grip_mse:.3f}"
             })
             
         final_loss = np.mean(epoch_losses)
@@ -143,33 +155,51 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         
         if do_eval:
             val_epoch_losses = []
-            val_probe_mses = []
+            val_pos_mses = []
+            val_rot_mses = []
+            val_grip_mses = []
             
             bridge_val_iter = bridge_val_loader.load(split="val")
             so100_val_iter = cycle_loader(so100_val_loader, split="val")
             
-            pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch")
-            for bridge_val_batch, so100_val_batch in pbar_val:
+            pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch", total=max_val_batches)
+            for batch_idx_val, (bridge_val_batch, so100_val_batch) in enumerate(pbar_val):
+                if max_val_batches and batch_idx_val >= max_val_batches:
+                    break
                 metrics_b_val = eval_step_fn(state, bridge_val_batch)
                 metrics_s_val = eval_step_fn(state, so100_val_batch)
                 
                 avg_val_loss = (metrics_b_val["loss"] + metrics_s_val["loss"]) / 2.0
-                avg_val_probe_mse = (metrics_b_val["probe_loss"] + metrics_s_val["probe_loss"]) / 2.0
+                avg_val_pos = (metrics_b_val["pos_mse"] + metrics_s_val["pos_mse"]) / 2.0
+                avg_val_rot = (metrics_b_val["rot_mse"] + metrics_s_val["rot_mse"]) / 2.0
+                avg_val_grip = (metrics_b_val["grip_mse"] + metrics_s_val["grip_mse"]) / 2.0
                 
                 val_epoch_losses.append(avg_val_loss)
-                val_probe_mses.append(avg_val_probe_mse)
+                val_pos_mses.append(avg_val_pos)
+                val_rot_mses.append(avg_val_rot)
+                val_grip_mses.append(avg_val_grip)
                 
                 pbar_val.set_postfix({
-                    "Val Avg L": f"{avg_val_loss:.3f}",
-                    "Val Probe MSE": f"{avg_val_probe_mse:.3f}"
+                    "Val L": f"{avg_val_loss:.3f}",
+                    "Pos": f"{avg_val_pos:.3f}",
+                    "Rot": f"{avg_val_rot:.3f}",
+                    "Grp": f"{avg_val_grip:.3f}"
                 })
                 
             final_val_loss = np.mean(val_epoch_losses)
-            final_val_probe = np.mean(val_probe_mses)
-            print(f"\\n🎯 Epoch {epoch+1} Validation Completed - Val Avg Loss: {final_val_loss:.4f} | Val Probe MSE: {final_val_probe:.4f}\\n")
+            final_val_pos = np.mean(val_pos_mses)
+            final_val_rot = np.mean(val_rot_mses)
+            final_val_grip = np.mean(val_grip_mses)
             
-            # If evaluating, return the validation loss to SMAC so we optimize for generalization!
-            final_loss = final_val_loss
+            # Create a weighted score so large rotation radian errors don't crush small positional meter errors
+            weighted_probe_score = final_val_pos * 1.0 + final_val_rot * 0.1 + final_val_grip * 0.1
+            
+            print(f"\\n🎯 Epoch {epoch+1} Validation Completed - Val Avg Loss: {final_val_loss:.4f} | Pos: {final_val_pos:.4f} | Rot: {final_val_rot:.4f} | Grp: {final_val_grip:.4f} | SMAC Score: {weighted_probe_score:.4f}\\n")
+            
+            # If evaluating, return the weighted PROBE MSE to SMAC.
+            # The self-supervised L2 loss is prone to 'representation collapse' (reaching 0.0).
+            # The Probe MSE is the only absolute ground-truth of representation quality.
+            final_loss = weighted_probe_score
             
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)

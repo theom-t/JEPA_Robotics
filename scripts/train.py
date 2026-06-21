@@ -6,6 +6,11 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["JAX_PLATFORMS"] = "cuda,cpu"
 
+# Force Hugging Face completely offline to prevent HTTP pings during cyclic dataloading
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["DISABLE_TELEMETRY"] = "1"
+
 # Add src to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 

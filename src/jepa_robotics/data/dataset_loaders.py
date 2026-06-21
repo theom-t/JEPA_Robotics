@@ -51,7 +51,10 @@ class BridgeDataLoader(BaseRobotDataset):
         import glob
         import os
         
-        print(f"Loading REAL BridgeData V2 (Raw TFRecord) from {self.tfds_data_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
+        # Only print this the very first time the loader starts
+        if not hasattr(self, "_has_logged"):
+            print(f"Loading REAL BridgeData V2 (Raw TFRecord) from {self.tfds_data_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
+            self._has_logged = True
         
         actual_split = "test" if split == "val" else split
         search_pattern = os.path.join(self.tfds_data_dir, "bridge", "0.1.0", f"bridge-{actual_split}.tfrecord*")
@@ -134,23 +137,24 @@ class SO100DataLoader(BaseRobotDataset):
         self.hf_repo = hf_repo
         self.offline_dir = offline_dir
         self.sample_fraction = sample_fraction
+        self._cached_dataset = None
 
-    def load(self, split: str = "train") -> Iterator[Dict[str, Any]]:
+    def _get_dataset(self, split: str):
         import os
-        import cv2
-        
-        print(f"Loading REAL LeRobot SO100 Data OFFLINE from {self.offline_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
-        
-        # Force Hugging Face into strictly offline mode to prevent HTTP requests
-        os.environ["HF_DATASETS_OFFLINE"] = "1"
-        os.environ["HF_HUB_OFFLINE"] = "1"
-        
+        from datasets.utils.logging import set_verbosity_error, disable_progress_bar
         from datasets import load_dataset
         
-        # Load the states/actions metadata (Parquet) strictly from the offline cache
-        dataset = load_dataset(self.hf_repo, split="train", cache_dir=self.offline_dir)
+        if self._cached_dataset is None:
+            # Force Hugging Face into strictly offline mode
+            os.environ["HF_DATASETS_OFFLINE"] = "1"
+            os.environ["HF_HUB_OFFLINE"] = "1"
+            set_verbosity_error()
+            disable_progress_bar()
+            self._cached_dataset = load_dataset(self.hf_repo, split="train", cache_dir=self.offline_dir)
+            
+        dataset = self._cached_dataset
         
-        # Hard 90/10 split to ensure completely disjoint subsets for train/val
+        # Hard 90/10 split
         total_rows = len(dataset)
         split_idx = int(total_rows * 0.9)
         
@@ -159,9 +163,18 @@ class SO100DataLoader(BaseRobotDataset):
         else:
             dataset = dataset.select(range(split_idx))
             
-        # Calculate EXACT subset and apply stratified shuffle to mix trajectories
-        slice_rows = int(len(dataset) * self.sample_fraction)
-        dataset = dataset.shuffle(seed=42).select(range(slice_rows))
+        slice_rows = max(1, int(len(dataset) * self.sample_fraction))
+        return dataset.shuffle(seed=42).select(range(slice_rows))
+
+    def load(self, split: str = "train") -> Iterator[Dict[str, Any]]:
+        import cv2
+        
+        # Only print this the very first time the loader starts
+        if not hasattr(self, "_has_logged"):
+            print(f"Loading REAL LeRobot SO100 Data OFFLINE from {self.offline_dir}... (Split: {split}, Fraction: {self.sample_fraction})")
+            self._has_logged = True
+            
+        dataset = self._get_dataset(split)
         
         # For HF LeRobot datasets, the video is chunked. For simplicity in this iterator,
         # we'll read frame by frame into sliding windows.
