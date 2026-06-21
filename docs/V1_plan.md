@@ -48,3 +48,16 @@ A `StateLinearProbe` continuously attempts to decode the 7D Cartesian XYZ/Roll-P
 
 ### Stage 4: Blackwell (RTX 5090) Hardening
 The codebase is hardened against XLA C++ autotuning spam and TPU initialization crashes using strict environment overrides (`TF_CPP_MIN_LOG_LEVEL=3`, `JAX_PLATFORMS=cuda,cpu`), ensuring clean telemetry generation.
+
+### Stage 5: Virtual Sandbox Validation
+Before deploying the V1 weights to a physical robot or advancing to V2, the system must pass a dual-tier virtual evaluation using a Mujoco physics simulation of the LeRobot SO100 arm. Because V1 is a state estimator and world model (not a policy), these tests evaluate *perception* and *imagination*, not task completion.
+
+#### 1. Automated Headless Testing (The "Stress Tester")
+A Python script runs thousands of randomized virtual trajectories headlessly in Mujoco:
+* **Perception Stress Test:** The simulator renders an image of the arm. The ViT + Linear Probe predicts the 10D pose coordinates. The camera is then virtually perturbed (moved slightly out of the training distribution) to generate a degradation curve, proving whether the ViT learned true 3D physics or merely memorized pixel patterns.
+* **Imagination Test:** The World Model is given a starting image and 10 future actions. It imagines the next 10 latent states, which the probe decodes into 10D coordinates. These are compared against the true Mujoco physics simulation to verify temporal forecasting accuracy.
+
+#### 2. Visual Interactive Testing (The "AI Debugger")
+A live, interactive visualizer designed to run on the home Linux host and stream over SSH to the remote laptop.
+* **Architecture:** To support smooth remote SSH viewing, the visualizer uses a lightweight Flask/FastAPI server to stream a high-framerate MJPEG feed of the Mujoco render directly to the remote laptop's web browser.
+* **Interactive Evaluation:** The user can manually drag the virtual SO100 arm around on the screen. A "Ghost Arm" overlay, driven entirely by the ViT's real-time coordinate predictions, must perfectly track the user's movements. If the user clicks "Imagine Trajectory", the World Model will cast a holographic prediction of the arm's future path, allowing intuitive, visual debugging of the AI's internal physics engine.

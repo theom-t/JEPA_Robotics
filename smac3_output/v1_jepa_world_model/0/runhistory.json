@@ -1,0 +1,74 @@
+{
+  "stats": {
+    "submitted": 2,
+    "finished": 2,
+    "running": 0
+  },
+  "data": [
+    {
+      "config_id": 1,
+      "instance": null,
+      "seed": 209652396,
+      "budget": 5.0,
+      "cost": 0.06245117783546448,
+      "time": 760.1970028877258,
+      "cpu_time": 9292.330874085,
+      "status": 1,
+      "starttime": 1782071405.469521,
+      "endtime": 1782072165.667291,
+      "additional_info": {}
+    },
+    {
+      "config_id": 2,
+      "instance": null,
+      "seed": 209652396,
+      "budget": 5.0,
+      "cost": 0.04850428570061922,
+      "time": 982.5205616950989,
+      "cpu_time": 9184.788547449,
+      "status": 1,
+      "starttime": 1782072165.6695523,
+      "endtime": 1782073148.1937234,
+      "additional_info": {}
+    }
+  ],
+  "configs": {
+    "1": {
+      "activation_fn": "gelu",
+      "batch_size": 16,
+      "latent_dim": 128,
+      "learning_rate": 2.65187149e-05,
+      "loss_alpha": 8.6272643617354,
+      "num_heads": 4,
+      "patch_size": 128,
+      "probe_learning_rate": 0.0098528350034,
+      "seq_len": 8,
+      "tau": 0.9970625621818,
+      "use_masking": true,
+      "vit_depth": 7,
+      "weight_decay": 7.6374307e-06,
+      "wm_depth": 2,
+      "masking_ratio": 0.8766694895923
+    },
+    "2": {
+      "activation_fn": "silu",
+      "batch_size": 16,
+      "latent_dim": 512,
+      "learning_rate": 0.0004928762213,
+      "loss_alpha": 4.4673659452237,
+      "num_heads": 8,
+      "patch_size": 16,
+      "probe_learning_rate": 0.0004938047613,
+      "seq_len": 6,
+      "tau": 0.9925432444951,
+      "use_masking": false,
+      "vit_depth": 3,
+      "weight_decay": 0.007631562498,
+      "wm_depth": 5
+    }
+  },
+  "config_origins": {
+    "1": "Initial Design: Sobol",
+    "2": "Initial Design: Sobol"
+  }
+}
