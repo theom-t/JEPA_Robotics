@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from jepa_robotics.training.loop import train_model
 from jepa_robotics.training.optimization import run_smac_optimization
 
-def run_single_mode(do_eval: bool = True):
+def run_single_mode(do_eval: bool = True, num_epochs: int = 100):
     """Executes a single debug/manual training run with predefined hyperparameters."""
     config = {
         "latent_dim": 256,
@@ -36,8 +36,8 @@ def run_single_mode(do_eval: bool = True):
         "loss_alpha": 1.0,
         "disable_wandb": True # Disable logging for simple tests, switch to False for real telemetry
     }
-    print("Running in SINGLE mode. Using default hyperparameter config.")
-    final_loss = train_model(config, num_epochs=10, do_eval=do_eval)
+    print(f"Running in SINGLE mode for {num_epochs} epochs. Using default hyperparameter config.")
+    final_loss = train_model(config, num_epochs=num_epochs, do_eval=do_eval, save_dir="checkpoints/v1_jepa")
     print(f"\\nSingle run completed. Final Loss: {final_loss:.4f}")
 
 def run_optimize_mode(do_eval: bool = True):
@@ -62,10 +62,16 @@ if __name__ == "__main__":
         default=True,
         help="Run the validation loop on a held-out test split after each epoch."
     )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=100,
+        help="Number of epochs to run when in 'single' mode (default: 100)."
+    )
     
     args = parser.parse_args()
     
     if args.mode == "single":
-        run_single_mode(do_eval=args.eval)
+        run_single_mode(do_eval=args.eval, num_epochs=args.epochs)
     elif args.mode == "optimize":
         run_optimize_mode(do_eval=args.eval)

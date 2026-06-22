@@ -4,13 +4,15 @@ import optax
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, Any
+import os
+import orbax.checkpoint as ocp
 
 from jepa_robotics.models.v_jepa import ViTEncoder, JEPAPredictor, StateLinearProbe
 from jepa_robotics.models.world_model import ActionConditionedTransformer
 from jepa_robotics.training.step import create_steps
 from jepa_robotics.data.dataset_loaders import BridgeDataLoader, SO100DataLoader
 
-def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = True) -> float:
+def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = True, save_dir: str = None) -> float:
     """
     Core orchestrator that binds dataloaders, compiles the network, 
     and executes the training loop.
@@ -212,6 +214,27 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             if np.isnan(final_loss):
                 print("\n[WARNING] Loss diverged to NaN. Aborting trial early to save compute.\n")
                 return 999.0
+            
+    if save_dir is not None:
+        print(f"\n[INFO] Saving final model checkpoint to {save_dir}...")
+        os.makedirs(save_dir, exist_ok=True)
+        # Use Orbax to save the model PyTrees
+        try:
+            # Newer orbax versions
+            ckptr = ocp.StandardCheckpointer()
+        except AttributeError:
+            # Older orbax versions
+            ckptr = ocp.PyTreeCheckpointer()
+            
+        save_state = {
+            "encoder_params": state["encoder_params"],
+            "predictor_params": state["predictor_params"],
+            "wm_params": state["wm_params"],
+            "probe_params": state["probe_params"]
+        }
+        
+        ckptr.save(os.path.abspath(save_dir), save_state, force=True)
+        print(f"[INFO] Model successfully saved to {save_dir}!\n")
             
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)
