@@ -16,8 +16,8 @@ def build_smac_scenario(run_name: str = "v1_jepa_world_model") -> Scenario:
     patch_size = Categorical("patch_size", [16, 32, 64, 128], default=16)
     
     # V-JEPA Masking Hierarchy
-    use_masking = Categorical("use_masking", [True, False], default=True)
-    masking_ratio = Float("masking_ratio", (0.5, 0.9), default=0.7)
+    use_masking = Categorical("use_masking", [True])
+    masking_ratio = Float("masking_ratio", (0.5, 0.95), default=0.7)
     
     # --- World Model Hyperparameters ---
     wm_depth = Integer("wm_depth", (2, 6), default=4)
