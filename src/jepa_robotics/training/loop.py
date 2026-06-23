@@ -103,8 +103,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)
     is_smac = config.get("is_smac_run", False)
-    # Use 4% of the dataset for SMAC to ensure epochs finish in ~3 minutes
-    sample_fraction = 0.04 if is_smac else 1.0
+    # Allow overriding sample_fraction, default to 4% for SMAC or 100% otherwise
+    sample_fraction = config.get("sample_fraction", 0.04 if is_smac else 1.0)
     
     # We also enforce a hard ceiling on batches per epoch during SMAC so it never hangs
     max_train_batches = 1000 if is_smac else None
@@ -218,14 +218,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     if save_dir is not None:
         print(f"\n[INFO] Saving final model checkpoint to {save_dir}...")
         os.makedirs(save_dir, exist_ok=True)
-        # Use Orbax to save the model PyTrees
-        try:
-            # Newer orbax versions
-            ckptr = ocp.StandardCheckpointer()
-        except AttributeError:
-            # Older orbax versions
-            ckptr = ocp.PyTreeCheckpointer()
-            
+        
         save_state = {
             "encoder_params": state["encoder_params"],
             "predictor_params": state["predictor_params"],
@@ -233,8 +226,14 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             "probe_params": state["probe_params"]
         }
         
-        ckptr.save(os.path.abspath(save_dir), save_state, force=True)
-        print(f"[INFO] Model successfully saved to {save_dir}!\n")
+        # Orbax can crash on JAX nightlies due to internal API changes. 
+        # Using standard flax serialization instead.
+        import flax.serialization
+        save_path = os.path.join(save_dir, "v1_weights.msgpack")
+        with open(save_path, "wb") as f:
+            f.write(flax.serialization.to_bytes(save_state))
+            
+        print(f"[INFO] Model successfully saved to {save_path}!\n")
             
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)

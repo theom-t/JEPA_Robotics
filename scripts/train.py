@@ -17,25 +17,28 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from jepa_robotics.training.loop import train_model
 from jepa_robotics.training.optimization import run_smac_optimization
 
-def run_single_mode(do_eval: bool = True, num_epochs: int = 100):
+def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool = False):
     """Executes a single debug/manual training run with predefined hyperparameters."""
     config = {
-        "latent_dim": 256,
-        "vit_depth": 4,
-        "patch_size": 16,
+        "latent_dim": 128,
+        "vit_depth": 3,
+        "patch_size": 32,
         "use_masking": True,
-        "masking_ratio": 0.5,
-        "wm_depth": 4,
-        "num_heads": 8,
-        "batch_size": 16,
+        "masking_ratio": 0.738,
+        "wm_depth": 6,
+        "num_heads": 4,
+        "batch_size": 32,
         "seq_len": 5,
-        "activation_fn": "gelu",
-        "learning_rate": 1e-4,
-        "weight_decay": 1e-4,
-        "tau": 0.996,
-        "loss_alpha": 1.0,
-        "disable_wandb": True # Disable logging for simple tests, switch to False for real telemetry
+        "activation_fn": "relu",
+        "learning_rate": 0.0005976,
+        "probe_learning_rate": 0.0001663,
+        "weight_decay": 0.002092,
+        "tau": 0.9995,
+        "loss_alpha": 6.457,
+        "disable_wandb": True, # Disable logging for simple tests, switch to False for real telemetry
     }
+    if fast_test:
+        config["sample_fraction"] = 0.1 # 10% data for fast testing without batch caps
     print(f"Running in SINGLE mode for {num_epochs} epochs. Using default hyperparameter config.")
     final_loss = train_model(config, num_epochs=num_epochs, do_eval=do_eval, save_dir="checkpoints/v1_jepa")
     print(f"\\nSingle run completed. Final Loss: {final_loss:.4f}")
@@ -65,13 +68,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs",
         type=int,
-        default=100,
+        default=20,
         help="Number of epochs to run when in 'single' mode (default: 100)."
+    )
+    parser.add_argument(
+        "--fast",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Run on a tiny 4% fraction of the data to quickly test the pipeline."
     )
     
     args = parser.parse_args()
     
     if args.mode == "single":
-        run_single_mode(do_eval=args.eval, num_epochs=args.epochs)
+        run_single_mode(do_eval=args.eval, num_epochs=args.epochs, fast_test=args.fast)
     elif args.mode == "optimize":
         run_optimize_mode(do_eval=args.eval)
