@@ -65,3 +65,5 @@ The robot must run entirely locally without relying on heavy desktop GPUs or clo
 `User Prompt` $\rightarrow$ `Text Embedding`
 `Webcam Image` $\rightarrow$ `Frozen ViT Encoder` $\rightarrow$ `Latent Physics Vector`
 `(Text + Latent + Proprioception)` $\rightarrow$ `Policy Head` $\rightarrow$ `Delta Actions (20 Hz)` $\rightarrow$ `Robot Servos`
+
+

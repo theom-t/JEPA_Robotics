@@ -21,6 +21,7 @@ data/
 *.hdf5
 *.h5
 *.tfrecord
+smac3_output/graphs
 
 # Python Package metadata
 *.egg-info/

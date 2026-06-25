@@ -32,20 +32,25 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     tau = config["tau"]
     
     # New extracted hyperparameters
-    patch_size = config.get("patch_size", 16)
-    use_masking = config.get("use_masking", True)
-    masking_ratio = config.get("masking_ratio", 0.7) if use_masking else 0.0
+    patch_size = config.get("patch_size", 32)
+    masking_ratio = config.get("masking_ratio", 0.75)
     activation_fn = config.get("activation_fn", "gelu")
     weight_decay = config.get("weight_decay", 1e-4)
     probe_lr = config.get("probe_learning_rate", 1e-3)
     batch_size = config.get("batch_size", 32)
     seq_len = config.get("seq_len", 5)
     loss_alpha = config.get("loss_alpha", 1.0)
-    
+    sigreg_weight = config.get("sigreg_weight", 0.1)
+
+    # Masking geometry — computed here so loop and step are in sync
+    image_size = 256
+    num_patches = (image_size // patch_size) ** 2
+    num_target = int(num_patches * masking_ratio)
+    num_context = num_patches - num_target
+
     encoder_def = ViTEncoder(
-        latent_dim=latent_dim, depth=vit_depth, num_heads=num_heads, 
-        patch_size=patch_size, activation_fn=activation_fn, 
-        use_masking=use_masking, masking_ratio=masking_ratio
+        latent_dim=latent_dim, depth=vit_depth, num_heads=num_heads,
+        patch_size=patch_size, activation_fn=activation_fn,
     )
     predictor_def = JEPAPredictor(
         latent_dim=latent_dim, activation_fn=activation_fn
@@ -56,30 +61,63 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     )
     probe_def = StateLinearProbe(out_dim=10)
     
-    # Mock inputs for initialization (Batch=batch_size, SeqLen-1 for World Model)
-    mock_img = jnp.ones((1, 256, 256, 3))
+    # Mock inputs for initialization
+    mock_img = jnp.ones((1, image_size, image_size, 3))
     mock_seq_latents = jnp.ones((batch_size, seq_len - 1, latent_dim))
     mock_seq_actions = jnp.ones((batch_size, seq_len - 1, 10))
-    
-    init_rngs = {'params': init_rng, 'dropout': init_rng}
-    
+    # Predictor now operates on patch-level sequences
+    mock_context_latents = jnp.ones((1, num_context, latent_dim))
+    mock_target_pos_emb = jnp.ones((1, num_target, latent_dim))
+
+    init_rngs = {'params': init_rng}
+
     # Initialize parameters
-    encoder_params = encoder_def.init(init_rngs, mock_img, train=False)
-    target_params = encoder_def.init(init_rngs, mock_img, train=False) # Clone structure
-    predictor_params = predictor_def.init(init_rng, jnp.ones((1, latent_dim)))
+    # Encoder init with no patch_indices → target encoder path (all patches)
+    encoder_params = encoder_def.init(init_rngs, mock_img)
+    target_params = encoder_def.init(init_rngs, mock_img)  # Same structure, separate params
+    predictor_params = predictor_def.init(init_rng, mock_context_latents, mock_target_pos_emb)
     wm_params = wm_def.init(init_rng, mock_seq_latents, mock_seq_actions)
     probe_params = probe_def.init(init_rng, jnp.ones((1, latent_dim)))
     
-    # 3. Setup Optax Optimizers (Decoupled & NaN-Protected)
+    # 3. Dynamic Learning Rate Scheduling & Optax Setup
+    is_smac = config.get("is_smac_run", False)
+    sample_fraction = config.get("sample_fraction", 0.04 if is_smac else 1.0)
+    max_train_batches = 1000 if is_smac else None
+    max_val_batches = 200 if is_smac else None
+    
+    # Calculate approximate total steps (Empirically: 100% dataset = ~26850 batches)
+    estimated_batches_per_epoch = int(26850 * sample_fraction)
+    if max_train_batches is not None:
+        estimated_batches_per_epoch = min(estimated_batches_per_epoch, max_train_batches)
+        
+    total_steps = num_epochs * estimated_batches_per_epoch
+    warmup_steps = int(total_steps * 0.1)  # 10% warmup
+    
+    core_lr_schedule = optax.warmup_cosine_decay_schedule(
+        init_value=1e-6,
+        peak_value=lr,
+        warmup_steps=warmup_steps,
+        decay_steps=total_steps - warmup_steps,
+        end_value=1e-6
+    )
+    
+    probe_lr_schedule = optax.warmup_cosine_decay_schedule(
+        init_value=1e-6,
+        peak_value=probe_lr,
+        warmup_steps=warmup_steps,
+        decay_steps=total_steps - warmup_steps,
+        end_value=1e-6
+    )
+    
     core_optimizer = optax.chain(
         optax.clip(10.0), # Safe scalar clipping. Global norm squaring can cause float32 'inf' overflows
         optax.zero_nans(),
-        optax.adamw(learning_rate=lr, weight_decay=weight_decay)
+        optax.adamw(learning_rate=core_lr_schedule, weight_decay=weight_decay)
     )
     probe_optimizer = optax.chain(
         optax.clip(10.0),
         optax.zero_nans(),
-        optax.adamw(learning_rate=probe_lr, weight_decay=0.0)
+        optax.adamw(learning_rate=probe_lr_schedule, weight_decay=0.0)
     )
     
     core_params_tuple = (encoder_params, predictor_params, wm_params)
@@ -99,16 +137,15 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     }
     
     # 4. Compile JAX Train and Eval Steps
-    train_step_fn, eval_step_fn = create_steps(encoder_def, predictor_def, wm_def, probe_def, core_optimizer, probe_optimizer, loss_alpha)
+    train_step_fn, eval_step_fn = create_steps(
+        encoder_def, predictor_def, wm_def, probe_def,
+        core_optimizer, probe_optimizer, loss_alpha,
+        patch_size=patch_size, image_size=image_size, masking_ratio=masking_ratio,
+        sigreg_weight=sigreg_weight,
+    )
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)
-    is_smac = config.get("is_smac_run", False)
-    # Allow overriding sample_fraction, default to 4% for SMAC or 100% otherwise
-    sample_fraction = config.get("sample_fraction", 0.04 if is_smac else 1.0)
-    
-    # We also enforce a hard ceiling on batches per epoch during SMAC so it never hangs
-    max_train_batches = 1000 if is_smac else None
-    max_val_batches = 200 if is_smac else None
+    # is_smac, sample_fraction, max_train_batches, and max_val_batches were defined above for the scheduler
     
     bridge_loader = BridgeDataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
     so100_loader = SO100DataLoader(batch_size=batch_size, seq_len=seq_len, sample_fraction=sample_fraction)
@@ -120,7 +157,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     final_loss = 0.0
     
     # 6. Execute Alternating Training Loop
-    print(f"\\nStarting Training Run (Latent: {latent_dim}, Epochs: {num_epochs}, Patch: {patch_size}, Masking: {use_masking})...")
+    print(f"\nStarting Training Run (Latent: {latent_dim}, Epochs: {num_epochs}, Patch: {patch_size}, MaskRatio: {masking_ratio:.2f}, SIGReg: {sigreg_weight:.3f})...")
     
     def cycle_loader(loader, split):
         """Yields batches continuously by restarting the loader when it hits StopIteration."""
@@ -201,8 +238,18 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             final_val_rot = np.mean(val_rot_mses)
             final_val_grip = np.mean(val_grip_mses)
             
-            # Create a weighted score so large rotation radian errors don't crush small positional meter errors
-            weighted_probe_score = final_val_pos * 1.0 + final_val_rot * 0.1 + final_val_grip * 0.1
+            # Normalised SMAC probe score.
+            # Raw MSE scales are not comparable: pos ~0.006, rot ~0.21, grip ~0.06.
+            # Dividing by the observed typical range (from V1 sweep, epochs 7-16) puts
+            # all three dimensions on equal footing before applying task-priority weights.
+            # Rotation carries equal weight to position (0.40 each): wrong orientation
+            # = task failure even if XYZ is correct. Grip is 0.20.
+            # Typical ranges: pos 0.006-0.020, rot 0.21-0.33, grip 0.06-0.24
+            weighted_probe_score = (
+                (final_val_pos  / 0.02) * 0.40
+              + (final_val_rot  / 0.25) * 0.40
+              + (final_val_grip / 0.10) * 0.20
+            )
             
             print(f"\\n🎯 Epoch {epoch+1} Validation Completed - Val Avg Loss: {final_val_loss:.4f} | Pos: {final_val_pos:.4f} | Rot: {final_val_rot:.4f} | Grp: {final_val_grip:.4f} | SMAC Score: {weighted_probe_score:.4f}\\n")
             

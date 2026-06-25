@@ -1,5 +1,5 @@
 {
-    "name": "v1_jepa_world_model",
+    "name": "v1_normalised_probe",
     "deterministic": true,
     "objectives": "cost",
     "crash_cost": Infinity,
@@ -8,7 +8,7 @@
     "cputime_limit": Infinity,
     "trial_walltime_limit": null,
     "trial_memory_limit": null,
-    "n_trials": 50,
+    "n_trials": 75,
     "use_default_config": false,
     "instances": null,
     "instance_features": null,
@@ -16,7 +16,7 @@
     "adaptive_capping_slackfactor": null,
     "runtime_cutoff": null,
     "min_budget": 4,
-    "max_budget": 10,
+    "max_budget": 16,
     "seed": 0,
     "n_workers": 1,
     "_meta": {
@@ -25,7 +25,7 @@
         },
         "runner": {
             "name": "TargetFunctionRunner",
-            "code": "b'd\\x01d\\x02l\\x00m\\x01}\\x03\\x01\\x00t\\x02|\\x00\\x83\\x01}\\x04d\\x03|\\x04d\\x04<\\x00t\\x03|\\x02\\x83\\x01}\\x05t\\x04d\\x05|\\x05\\x9b\\x00d\\x06|\\x02\\x9b\\x00d\\x07\\x9d\\x05\\x83\\x01\\x01\\x00|\\x03|\\x04|\\x05\\x88\\x00d\\x08\\x8d\\x03}\\x06t\\x05|\\x06\\x83\\x01S\\x00'"
+            "code": "b'd\\x01d\\x02l\\x00m\\x01}\\x03\\x01\\x00t\\x02|\\x00\\x83\\x01}\\x04d\\x03|\\x04d\\x04<\\x00t\\x03|\\x02\\x83\\x01}\\x05t\\x04d\\x05|\\x05\\x9b\\x00d\\x06|\\x04\\xa0\\x05d\\x07\\xa1\\x01\\x9b\\x00d\\x08|\\x04\\xa0\\x05d\\t\\xa1\\x01\\x9b\\x00d\\n|\\x04\\xa0\\x05d\\x0b\\xa1\\x01\\x9b\\x00d\\x0c|\\x04\\xa0\\x05d\\rd\\x01\\xa1\\x02d\\x0e\\x9b\\x04d\\x0f|\\x04\\xa0\\x05d\\x10d\\x01\\xa1\\x02d\\x11\\x9b\\x04d\\x12|\\x04\\xa0\\x05d\\x13d\\x01\\xa1\\x02d\\x14\\x9b\\x04\\x9d\\x0e\\x83\\x01\\x01\\x00|\\x03|\\x04|\\x05\\x88\\x00d\\x15\\x8d\\x03}\\x06t\\x06|\\x06\\x83\\x01S\\x00'"
         },
         "model": {
             "name": "RandomForest",
@@ -35,12 +35,12 @@
                 3,
                 0,
                 0,
+                0,
+                3,
                 2,
-                4,
                 0,
                 0,
                 0,
-                1,
                 0,
                 0,
                 0,
@@ -68,12 +68,28 @@
                     1.0
                 ],
                 [
+                    0,
+                    1.0
+                ],
+                [
+                    3,
+                    NaN
+                ],
+                [
                     2,
                     NaN
                 ],
                 [
-                    4,
-                    NaN
+                    0,
+                    1.0
+                ],
+                [
+                    0,
+                    1.0
+                ],
+                [
+                    0,
+                    1.0
                 ],
                 [
                     0,
@@ -88,23 +104,7 @@
                     1.0
                 ],
                 [
-                    1,
-                    NaN
-                ],
-                [
                     0,
-                    1.0
-                ],
-                [
-                    0,
-                    1.0
-                ],
-                [
-                    0,
-                    1.0
-                ],
-                [
-                    -1.0,
                     1.0
                 ]
             ],
@@ -187,7 +187,7 @@
         },
         "initial_design": {
             "name": "SobolInitialDesign",
-            "n_configs": 12,
+            "n_configs": 18,
             "n_configs_per_hyperparameter": 10,
             "additional_configs": [],
             "seed": 0
@@ -217,5 +217,5 @@
         },
         "version": "2.4.0"
     },
-    "output_directory": "smac3_output/v1_jepa_world_model/0"
+    "output_directory": "smac3_output/v1_normalised_probe/0"
 }

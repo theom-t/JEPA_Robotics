@@ -16,10 +16,17 @@ This document tracks the high-level software architecture for the Cross-Embodime
 *   **Technology:** JAX-accelerated matrix multiplications (Forward Kinematics based on Denavit-Hartenberg parameters).
 
 ## 3. Perception Engine (V-JEPA)
-*   **Goal:** Compress raw pixel data into a dense, informative latent space without relying heavily on reconstruction.
+*   **Goal:** Compress raw pixel data into a dense, informative latent space without relying on pixel reconstruction.
 *   **Architecture:** Vision Transformer (ViT) implemented via `flax.linen`.
-*   **Target:** Highly modular so the encoder can be frozen, quantized, and deployed to edge hardware (Jetson Orin Nano) independently of the World Model.
-*   **Hyperparameter Initialization:** The latent dimension and network depth are parameterized and discovered dynamically by the SMAC3 optimization loop.
+*   **True Spatial Masking:** Each training step generates a random spatial mask splitting the `N_patches` into:
+    *   **Context patches** (`N_context = N * (1 - masking_ratio)`): passed to the Context Encoder (E_x) via `patch_indices`. E_x is completely blind to the masked region.
+    *   **Target patches** (`N_target = N * masking_ratio`): held out from E_x.
+    *   Positional embeddings are applied to ALL patches *before* selection, preserving spatial coordinates in the context tokens.
+*   **Context Encoder (E_x):** Processes only `N_context` patch tokens. Updated via backpropagation.
+*   **Target Encoder (E_y):** Processes all `N_patches` (no masking). Updated via EMA (`tau`) of E_x — never by backprop. Provides ground-truth latent targets.
+*   **Predictor (P):** Receives E_x context latents + target positional embeddings (from E_y's param table). A learnable mask token is placed at each target position and attended over jointly with context latents. Outputs per-patch predictions for the masked region only.
+*   **JEPA Loss:** L2 distance computed **only on the masked patch positions** in latent space — no pixel reconstruction.
+*   **Modularity:** The encoder can be frozen, quantized, and deployed to edge hardware (Jetson Orin Nano) independently of the World Model.
 
 ## 4. Latent World Model
 *   **Goal:** Predict future states and plan actions entirely within the latent space derived by the V-JEPA encoder, conditioned on the 7D Cartesian action space.

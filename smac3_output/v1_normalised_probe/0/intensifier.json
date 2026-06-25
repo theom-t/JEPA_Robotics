@@ -1,0 +1,119 @@
+{
+  "incumbent_ids": [
+    12
+  ],
+  "rejected_config_ids": [
+    2,
+    3,
+    1,
+    5,
+    6,
+    7,
+    8,
+    9,
+    4,
+    11,
+    13,
+    14,
+    10,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "incumbents_changed": 4,
+  "trajectory": [
+    {
+      "config_ids": [
+        1
+      ],
+      "costs": [
+        0.7060276359319687
+      ],
+      "trial": 1,
+      "walltime": 1252.9180369377136
+    },
+    {
+      "config_ids": [
+        4
+      ],
+      "costs": [
+        0.6553406924009324
+      ],
+      "trial": 4,
+      "walltime": 3959.01429104805
+    },
+    {
+      "config_ids": [
+        10
+      ],
+      "costs": [
+        0.6103062033653259
+      ],
+      "trial": 14,
+      "walltime": 32265.78612613678
+    },
+    {
+      "config_ids": [
+        12
+      ],
+      "costs": [
+        0.604894646257162
+      ],
+      "trial": 19,
+      "walltime": 36954.28842282295
+    }
+  ],
+  "state": {
+    "tracker": {
+      "0,1": [
+        [
+          0,
+          [
+            {
+              "activation_fn": "relu",
+              "batch_size": 32,
+              "latent_dim": 512,
+              "learning_rate": 0.0004587737644,
+              "loss_alpha": 1.8597437672544,
+              "masking_ratio": 0.6106072793266,
+              "num_heads": 8,
+              "patch_size": 32,
+              "probe_learning_rate": 0.0083750515686,
+              "seq_len": 3,
+              "sigreg_weight": 0.0278778923546,
+              "tau": 0.9941687348651,
+              "vit_depth": 3,
+              "weight_decay": 0.0023443163551,
+              "wm_depth": 5
+            },
+            {
+              "activation_fn": "relu",
+              "batch_size": 16,
+              "latent_dim": 512,
+              "learning_rate": 0.0003103761198,
+              "loss_alpha": 3.6688522331937,
+              "masking_ratio": 0.7109707351585,
+              "num_heads": 4,
+              "patch_size": 32,
+              "probe_learning_rate": 0.0003661765338,
+              "seq_len": 3,
+              "sigreg_weight": 0.0252551346147,
+              "tau": 0.9953564991063,
+              "vit_depth": 5,
+              "weight_decay": 0.0022221064642,
+              "wm_depth": 6
+            }
+          ]
+        ]
+      ]
+    },
+    "next_bracket": 1
+  }
+}

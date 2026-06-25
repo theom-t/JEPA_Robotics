@@ -23,7 +23,6 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool 
         "latent_dim": 128,
         "vit_depth": 3,
         "patch_size": 32,
-        "use_masking": True,
         "masking_ratio": 0.738,
         "wm_depth": 6,
         "num_heads": 4,
@@ -35,6 +34,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool 
         "weight_decay": 0.002092,
         "tau": 0.9995,
         "loss_alpha": 6.457,
+        "sigreg_weight": 0.1,
         "disable_wandb": True, # Disable logging for simple tests, switch to False for real telemetry
     }
     if fast_test:
