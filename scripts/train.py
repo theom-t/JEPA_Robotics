@@ -20,27 +20,27 @@ from jepa_robotics.training.optimization import run_smac_optimization
 def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool = False):
     """Executes a single debug/manual training run with predefined hyperparameters."""
     config = {
-        "latent_dim": 128,
-        "vit_depth": 3,
-        "patch_size": 32,
-        "masking_ratio": 0.738,
-        "wm_depth": 6,
-        "num_heads": 4,
-        "batch_size": 32,
-        "seq_len": 5,
-        "activation_fn": "relu",
-        "learning_rate": 0.0005976,
-        "probe_learning_rate": 0.0001663,
-        "weight_decay": 0.002092,
-        "tau": 0.9995,
-        "loss_alpha": 6.457,
-        "sigreg_weight": 0.1,
-        "disable_wandb": True, # Disable logging for simple tests, switch to False for real telemetry
+        "latent_dim": 256,         # Jetson Orin Nano friendly, highest SMAC peak
+        "vit_depth": 7,            # Deep ViT (Sobol winners used 7)
+        "patch_size": 16,          # High spatial acuity for robot manipulation
+        "masking_ratio": 0.75,     # Strong semantic reasoning pressure
+        "wm_depth": 4,             # Sufficient depth for temporal prediction
+        "num_heads": 16,           # Best SMAC performer
+        "batch_size": 64,          # Stable contrastive gradients
+        "seq_len": 6,              # Forced long-horizon temporal reasoning (No SMAC cheating)
+        "activation_fn": "gelu",   # Best peak
+        "learning_rate": 0.0003,
+        "probe_learning_rate": 0.004,
+        "weight_decay": 0.005,
+        "tau": 0.995,
+        "loss_alpha": 1.0,         # Stable L1/L2 weighting
+        "sigreg_weight": 0.02,     # The SMAC global minima for stable regularisation
+        "disable_wandb": True,
     }
     if fast_test:
-        config["sample_fraction"] = 0.1 # 10% data for fast testing without batch caps
-    print(f"Running in SINGLE mode for {num_epochs} epochs. Using default hyperparameter config.")
-    final_loss = train_model(config, num_epochs=num_epochs, do_eval=do_eval, save_dir="checkpoints/v1_jepa")
+        config["sample_fraction"] = 0.05 # 5% data for fast testing
+    print(f"Running in SINGLE mode for {num_epochs} epochs. Using final V-JEPA backbone config.")
+    final_loss = train_model(config, num_epochs=num_epochs, do_eval=do_eval, save_dir="checkpoints/v1_jepa_backbone")
     print(f"\\nSingle run completed. Final Loss: {final_loss:.4f}")
 
 def run_optimize_mode(do_eval: bool = True):

@@ -6,6 +6,48 @@ from tqdm import tqdm
 from typing import Dict, Any
 import os
 import orbax.checkpoint as ocp
+import threading
+import queue
+
+class BackgroundPrefetcher:
+    """Wraps an iterator in a background thread to prevent GPU starvation."""
+    def __init__(self, iterator, max_prefetch=4):
+        self.iterator = iterator
+        self.queue = queue.Queue(maxsize=max_prefetch)
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._worker, daemon=True)
+        self.thread.start()
+
+    def _worker(self):
+        try:
+            for item in self.iterator:
+                if self.stop_event.is_set():
+                    break
+                self.queue.put(item)
+        except Exception as e:
+            self.queue.put(e)
+        finally:
+            self.queue.put(StopIteration)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        item = self.queue.get()
+        if item is StopIteration:
+            raise StopIteration
+        if isinstance(item, Exception):
+            raise item
+        return item
+        
+    def close(self):
+        self.stop_event.set()
+        # Empty queue to unblock the worker thread if it's waiting to put
+        while not self.queue.empty():
+            try:
+                self.queue.get_nowait()
+            except queue.Empty:
+                break
 
 from jepa_robotics.models.v_jepa import ViTEncoder, JEPAPredictor, StateLinearProbe
 from jepa_robotics.models.world_model import ActionConditionedTransformer
@@ -166,8 +208,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
                 yield batch
 
     for epoch in range(num_epochs):
-        bridge_iter = bridge_loader.load(split="train")
-        so100_iter = cycle_loader(so100_loader, split="train")
+        bridge_iter = BackgroundPrefetcher(bridge_loader.load(split="train"), max_prefetch=8)
+        so100_iter = BackgroundPrefetcher(cycle_loader(so100_loader, split="train"), max_prefetch=8)
         
         epoch_losses = []
         pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch", total=max_train_batches)
@@ -198,6 +240,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             })
             
         final_loss = np.mean(epoch_losses)
+        bridge_iter.close()
+        so100_iter.close()
         print(f"\\n✅ Epoch {epoch+1} Train Completed - Avg Loss: {final_loss:.4f}\\n")
         
         if do_eval:
@@ -206,8 +250,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             val_rot_mses = []
             val_grip_mses = []
             
-            bridge_val_iter = bridge_val_loader.load(split="val")
-            so100_val_iter = cycle_loader(so100_val_loader, split="val")
+            bridge_val_iter = BackgroundPrefetcher(bridge_val_loader.load(split="val"), max_prefetch=4)
+            so100_val_iter = BackgroundPrefetcher(cycle_loader(so100_val_loader, split="val"), max_prefetch=4)
             
             pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch", total=max_val_batches)
             for batch_idx_val, (bridge_val_batch, so100_val_batch) in enumerate(pbar_val):
@@ -237,6 +281,9 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             final_val_pos = np.mean(val_pos_mses)
             final_val_rot = np.mean(val_rot_mses)
             final_val_grip = np.mean(val_grip_mses)
+            
+            bridge_val_iter.close()
+            so100_val_iter.close()
             
             # Normalised SMAC probe score.
             # Raw MSE scales are not comparable: pos ~0.006, rot ~0.21, grip ~0.06.

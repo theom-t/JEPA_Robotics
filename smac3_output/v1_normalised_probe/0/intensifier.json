@@ -25,7 +25,18 @@
     21,
     22,
     23,
-    24
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35
   ],
   "incumbents_changed": 4,
   "trajectory": [
@@ -72,48 +83,65 @@
   ],
   "state": {
     "tracker": {
-      "0,1": [
+      "1,0": [
         [
           0,
           [
             {
-              "activation_fn": "relu",
+              "activation_fn": "gelu",
               "batch_size": 32,
-              "latent_dim": 512,
-              "learning_rate": 0.0004587737644,
-              "loss_alpha": 1.8597437672544,
-              "masking_ratio": 0.6106072793266,
-              "num_heads": 8,
+              "latent_dim": 256,
+              "learning_rate": 9.53111216e-05,
+              "loss_alpha": 0.3815272851026,
+              "masking_ratio": 0.5642729640007,
+              "num_heads": 16,
               "patch_size": 32,
-              "probe_learning_rate": 0.0083750515686,
-              "seq_len": 3,
-              "sigreg_weight": 0.0278778923546,
-              "tau": 0.9941687348651,
-              "vit_depth": 3,
-              "weight_decay": 0.0023443163551,
+              "probe_learning_rate": 0.0015057316121,
+              "seq_len": 5,
+              "sigreg_weight": 0.0141812490722,
+              "tau": 0.9998620819179,
+              "vit_depth": 6,
+              "weight_decay": 0.0036958305916,
               "wm_depth": 5
             },
             {
-              "activation_fn": "relu",
-              "batch_size": 16,
+              "activation_fn": "gelu",
+              "batch_size": 64,
               "latent_dim": 512,
-              "learning_rate": 0.0003103761198,
-              "loss_alpha": 3.6688522331937,
-              "masking_ratio": 0.7109707351585,
+              "learning_rate": 7.94031481e-05,
+              "loss_alpha": 0.1490187706967,
+              "masking_ratio": 0.5403858686965,
+              "num_heads": 8,
+              "patch_size": 16,
+              "probe_learning_rate": 0.0052424709707,
+              "seq_len": 4,
+              "sigreg_weight": 0.0160326465815,
+              "tau": 0.9992704304796,
+              "vit_depth": 8,
+              "weight_decay": 0.0037155384563,
+              "wm_depth": 5
+            },
+            {
+              "activation_fn": "gelu",
+              "batch_size": 64,
+              "latent_dim": 512,
+              "learning_rate": 7.79113863e-05,
+              "loss_alpha": 0.4591354241335,
+              "masking_ratio": 0.5344068186173,
               "num_heads": 4,
               "patch_size": 32,
-              "probe_learning_rate": 0.0003661765338,
+              "probe_learning_rate": 0.0030023494371,
               "seq_len": 3,
-              "sigreg_weight": 0.0252551346147,
-              "tau": 0.9953564991063,
-              "vit_depth": 5,
-              "weight_decay": 0.0022221064642,
-              "wm_depth": 6
+              "sigreg_weight": 0.5065511719825,
+              "tau": 0.9995994037965,
+              "vit_depth": 6,
+              "weight_decay": 0.0036905810486,
+              "wm_depth": 2
             }
           ]
         ]
       ]
     },
-    "next_bracket": 1
+    "next_bracket": 2
   }
 }

@@ -34,6 +34,13 @@ RUNHISTORY_PATH = (
 )
 OUTPUT_DIR = "/home/tmainetucker/Repos/JEPA_Robotics/smac3_output/graphs"
 
+# ── Filtering ─────────────────────────────────────────────────────────────────
+# Any evaluation with cost > COST_CEILING is treated as a pathological outlier
+# and excluded from all charts. Config 2 (cost 1.24) is the current offender.
+# The normalised probe score has a natural upper bound of ~1.0 for a model that
+# is barely better than random on all three dimensions, so 1.0 is a sound ceil.
+COST_CEILING: float = 1.0
+
 # ── Hyperparameter metadata ───────────────────────────────────────────────────
 # (name, is_log_scale, is_categorical)
 HP_META = [
@@ -82,6 +89,7 @@ def load_runhistory(path: str) -> dict:
 def best_per_config(data: list, configs: dict, origins: dict) -> list:
     """
     For each unique config, keep only the entry at its highest observed budget.
+    Evaluations with cost > COST_CEILING are silently dropped as outliers.
     Returns a list of dicts with keys:
         config_id, budget, cost, config, origin
     """
@@ -90,6 +98,8 @@ def best_per_config(data: list, configs: dict, origins: dict) -> list:
         cid   = str(entry["config_id"])
         cost  = entry["cost"]
         budg  = entry["budget"]
+        if cost > COST_CEILING:
+            continue  # outlier — skip entirely
         if cid not in best or budg > best[cid]["budget"] or (
             budg == best[cid]["budget"] and cost < best[cid]["cost"]
         ):
@@ -183,6 +193,12 @@ def make_slice_continuous(
     if log_scale:
         ax.set_xscale("log")
 
+    # Clip y-axis so outliers outside COST_CEILING don't compress the view
+    if all_y:
+        y_lo = max(0.0, min(all_y) * 0.97)
+        y_hi = min(COST_CEILING, max(all_y) * 1.03)
+        ax.set_ylim(y_lo, y_hi)
+
     ax.set_xlabel(hp_name, fontsize=8)
     ax.set_ylabel("SMAC Score (↓ better)", fontsize=8)
     ax.set_title(f"Slice: {hp_name}", fontsize=9, fontweight="bold")
@@ -247,6 +263,14 @@ def make_slice_categorical(
 
     ax.set_xticks(range(len(categories)))
     ax.set_xticklabels(categories, fontsize=7, rotation=15)
+
+    # Clip y-axis
+    all_cat_costs = [c for vals in cat_data.values() for c in vals]
+    if all_cat_costs:
+        y_lo = max(0.0, min(all_cat_costs) * 0.97)
+        y_hi = min(COST_CEILING, max(all_cat_costs) * 1.03)
+        ax.set_ylim(y_lo, y_hi)
+
     ax.set_xlabel(hp_name, fontsize=8)
     ax.set_ylabel("SMAC Score (↓ better)", fontsize=8)
     ax.set_title(f"Slice: {hp_name}", fontsize=9, fontweight="bold")
@@ -258,14 +282,25 @@ def make_convergence_trace(data: list, configs: dict, origins: dict, output_dir:
 
     trial_num, costs, best_costs = [], [], []
     current_best = float("inf")
+    skipped = 0
 
     for i, entry in enumerate(data):
         cost = entry["cost"]
         budg = entry["budget"]
         cid  = str(entry["config_id"])
         orig = origins.get(cid, "Unknown")
+
+        # Track best ignoring ceiling filter so the red line is always correct
         if cost < current_best:
             current_best = cost
+
+        # Exclude outliers from the scatter but not from the best-cost line
+        if cost > COST_CEILING:
+            skipped += 1
+            trial_num.append(i + 1)
+            costs.append(None)          # gap in scatter
+            best_costs.append(current_best)
+            continue
 
         color  = BUDGET_COLORS.get(budg, "#999999")
         marker = ORIGIN_MARKERS.get(orig, "s")
@@ -276,8 +311,20 @@ def make_convergence_trace(data: list, configs: dict, origins: dict, output_dir:
         costs.append(cost)
         best_costs.append(current_best)
 
+    if skipped:
+        print(f"  (convergence trace: {skipped} outlier(s) above "
+              f"COST_CEILING={COST_CEILING} hidden from scatter)")
+
     ax.plot(trial_num, best_costs, color="#C00000",
             linewidth=2.2, label="Best cost so far", zorder=4)
+
+    # Keep y-axis tightly around the visible range
+    visible = [c for c in costs if c is not None]
+    if visible:
+        ax.set_ylim(
+            max(0.0, min(visible) * 0.97),
+            min(COST_CEILING, max(visible) * 1.03),
+        )
 
     # Legend
     budget_handles = [
