@@ -204,12 +204,21 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     def cycle_loader(loader, split):
         """Yields batches continuously by restarting the loader when it hits StopIteration."""
         while True:
+            yielded_any = False
             for batch in loader.load(split=split):
+                yielded_any = True
                 yield batch
+            
+            if not yielded_any:
+                raise RuntimeError(f"FATAL: {loader.__class__.__name__} ({split}) yielded ZERO batches! "
+                                   f"The dataset slice is too small to form a single batch of size {loader.batch_size}. "
+                                   f"This would cause an infinite loop in the background thread.")
 
     for epoch in range(num_epochs):
-        bridge_iter = BackgroundPrefetcher(bridge_loader.load(split="train"), max_prefetch=8)
-        so100_iter = BackgroundPrefetcher(cycle_loader(so100_loader, split="train"), max_prefetch=8)
+        # Cap prefetch at 2. Each float32 batch is ~603 MB. 
+        # A queue of 8 would hold almost 5 GB per dataloader!
+        bridge_iter = BackgroundPrefetcher(bridge_loader.load(split="train"), max_prefetch=2)
+        so100_iter = BackgroundPrefetcher(cycle_loader(so100_loader, split="train"), max_prefetch=2)
         
         epoch_losses = []
         pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch", total=max_train_batches)
@@ -250,8 +259,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             val_rot_mses = []
             val_grip_mses = []
             
-            bridge_val_iter = BackgroundPrefetcher(bridge_val_loader.load(split="val"), max_prefetch=4)
-            so100_val_iter = BackgroundPrefetcher(cycle_loader(so100_val_loader, split="val"), max_prefetch=4)
+            bridge_val_iter = BackgroundPrefetcher(bridge_val_loader.load(split="val"), max_prefetch=2)
+            so100_val_iter = BackgroundPrefetcher(cycle_loader(so100_val_loader, split="val"), max_prefetch=2)
             
             pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch", total=max_val_batches)
             for batch_idx_val, (bridge_val_batch, so100_val_batch) in enumerate(pbar_val):

@@ -107,10 +107,18 @@ def create_steps(
     ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
         """Full V-JEPA + World Model forward pass and loss computation."""
 
-        # Cleanse potential NaNs from corrupted dataset frames
-        images = jnp.nan_to_num(batch["image"])        # (B, S, H, W, C)
-        actions = jnp.nan_to_num(batch["action_10d"])  # (B, S, 10)
-        state_targets = jnp.nan_to_num(batch["state_10d"])
+        # --- Automatic Mixed Precision (AMP) ---
+        # Cast inputs and parameters to bfloat16 to leverage Tensor Cores and halve VRAM.
+        # Gradients will natively flow back to the float32 master weights outside loss_fn.
+        images = jnp.nan_to_num(batch["image"]).astype(jnp.bfloat16)        # (B, S, H, W, C)
+        actions = jnp.nan_to_num(batch["action_10d"]).astype(jnp.bfloat16)  # (B, S, 10)
+        state_targets = jnp.nan_to_num(batch["state_10d"]).astype(jnp.float32) # Keep targets float32 for MSE
+        
+        enc_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), encoder_params)
+        pred_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), predictor_params)
+        wm_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), wm_params)
+        targ_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), target_params)
+        probe_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), probe_params)
 
         b, s, h, w, c = images.shape
         flat_images = images.reshape((b * s, h, w, c))  # (B*S, H, W, C)
@@ -129,7 +137,7 @@ def create_steps(
         # E_x is BLIND to the masked region — it only processes context patches.
         # This forces the Predictor to genuinely infer missing spatial content.
         context_patch_latents, context_pooled = encoder_def.apply(
-            encoder_params,
+            enc_p,
             flat_images,
             patch_indices=context_indices,
         )
@@ -140,7 +148,7 @@ def create_steps(
         # E_y sees ALL patches — it is the EMA teacher, providing clean targets.
         # stop_gradient: E_y is never updated by backprop, only via EMA.
         target_patch_latents, target_pooled = encoder_def.apply(
-            target_params,
+            targ_p,
             flat_images,
             patch_indices=None,  # All patches — no masking on the target path
         )
@@ -156,7 +164,7 @@ def create_steps(
         # The Predictor needs to know WHERE in the image the masked patches are.
         # We reuse the encoder's learned positional embedding table (from target_params
         # so the positions match the E_y feature space). Sliced to target positions.
-        pos_embedding = target_params["params"]["pos_embedding"]  # (1, N_patches, D)
+        pos_embedding = targ_p["params"]["pos_embedding"]  # (1, N_patches, D)
         target_pos_emb = pos_embedding[:, target_indices, :]       # (1, N_target, D)
         target_pos_emb = jnp.broadcast_to(
             target_pos_emb, (b * s, num_target, encoder_def.latent_dim)
@@ -166,7 +174,7 @@ def create_steps(
         # P receives visible context latents + positional hints for the masked region,
         # and predicts what E_y would have produced at those masked positions.
         predicted_target_latents = predictor_def.apply(
-            predictor_params,
+            pred_p,
             context_patch_latents,
             target_pos_emb,
         )  # (B*S, N_target, D)
@@ -186,7 +194,7 @@ def create_steps(
         seq_context = context_pooled_seq[:, :-1, :]  # (B, S-1, D) — frames t=0..S-2
         seq_actions = actions[:, :-1, :]             # (B, S-1, 10)
 
-        predicted_next_states = world_model_def.apply(wm_params, seq_context, seq_actions)
+        predicted_next_states = world_model_def.apply(wm_p, seq_context, seq_actions)
         # (B, S-1, D)
 
         # Temporal Dynamics Loss: compare predicted next state vs. true E_y next state
@@ -198,8 +206,11 @@ def create_steps(
         # Regresses the 10D physical state from the pooled context latents.
         # Operates on a stop_gradient copy — the probe never affects the encoder.
         sg_latents = jax.lax.stop_gradient(context_pooled_seq)  # (B, S, D)
-        predicted_states = probe_def.apply(probe_params, sg_latents)  # (B, S, 10)
-
+        predicted_states = probe_def.apply(probe_p, sg_latents)  # (B, S, 10)
+        
+        # Cast predictions back to float32 before computing MSE to preserve numerical stability
+        predicted_states = predicted_states.astype(jnp.float32)
+        
         pos_diff = predicted_states[..., :3] - state_targets[..., :3]
         rot_diff = predicted_states[..., 3:9] - state_targets[..., 3:9]
         grip_diff = predicted_states[..., 9:] - state_targets[..., 9:]
@@ -219,18 +230,18 @@ def create_steps(
         flat_pooled = context_pooled_seq.reshape((b * s, -1))  # (B*S, D)
         sig_reg = sigreg_loss(flat_pooled, sigreg_rng, num_sketches=num_sigreg_sketches)
 
-        # ── 10. Total Loss ────────────────────────────────────────────────────
-        total_loss = latent_loss + loss_alpha * temporal_loss + probe_loss + sigreg_weight * sig_reg
+        # ── 10. Total Loss (Computed in Float32) ──────────────────────────────
+        total_loss = latent_loss.astype(jnp.float32) + loss_alpha * temporal_loss.astype(jnp.float32) + probe_loss + sigreg_weight * sig_reg.astype(jnp.float32)
 
         metrics = {
-            "loss": latent_loss + loss_alpha * temporal_loss,  # Core physics signal
-            "latent_l2_loss": latent_loss,
-            "temporal_dynamics_loss": temporal_loss,
-            "probe_loss": probe_loss,
-            "sig_reg": sig_reg,
-            "pos_mse": pos_mse,
-            "rot_mse": rot_mse,
-            "grip_mse": grip_mse,
+            "loss": latent_loss.astype(jnp.float32) + loss_alpha * temporal_loss.astype(jnp.float32),  # Core physics signal
+            "latent_l2_loss": latent_loss.astype(jnp.float32),
+            "temporal_dynamics_loss": temporal_loss.astype(jnp.float32),
+            "probe_loss": probe_loss.astype(jnp.float32),
+            "sig_reg": sig_reg.astype(jnp.float32),
+            "pos_mse": pos_mse.astype(jnp.float32),
+            "rot_mse": rot_mse.astype(jnp.float32),
+            "grip_mse": grip_mse.astype(jnp.float32),
         }
 
         return total_loss, metrics

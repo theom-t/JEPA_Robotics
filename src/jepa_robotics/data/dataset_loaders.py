@@ -1,8 +1,6 @@
 """
 Object-Oriented dataset loaders for BridgeData V2 and LeRobot SO100.
 """
-import jax
-import jax.numpy as jnp
 import numpy as np
 import cv2
 from typing import Dict, Any, Optional, Iterator
@@ -36,7 +34,7 @@ class BaseRobotDataset:
                 rpy = flat[:, 3:6]
                 gripper = flat[:, 6:]
                 rot_6d = rpy_to_6d(rpy)
-                flat_10d = jnp.concatenate([xyz, rot_6d, gripper], axis=-1)
+                flat_10d = np.concatenate([xyz, rot_6d, gripper], axis=-1)
                 return flat_10d.reshape(b, s, 10)
                 
             if "joint_states" in batch:
@@ -138,17 +136,18 @@ class BridgeDataLoader(BaseRobotDataset):
         
         # Batch the windows
         batched_ds = window_ds.batch(self.batch_size, drop_remainder=True)
-        batched_ds = batched_ds.prefetch(tf.data.AUTOTUNE)
+        # Cap tf.data prefetch to 2 batches. AUTOTUNE will eagerly devour all 32GB of RAM 
+        # since each 128-size float32 batch is ~603 MB!
+        batched_ds = batched_ds.prefetch(2)
         
         if self.limit:
             batched_ds = batched_ds.take(self.limit)
             
-        # Convert to numpy iterator for JAX
         for imgs, states, actions in batched_ds.as_numpy_iterator():
             batch = {
-                "image": jnp.array(imgs),           # (B, S, 256, 256, 3)
-                "joint_states": jnp.array(states),  # (B, S, 7) for WidowX
-                "joint_actions": jnp.array(actions) # (B, S, 7) for WidowX
+                "image": np.array(imgs),           # (B, S, 256, 256, 3)
+                "joint_states": np.array(states),  # (B, S, 7) for WidowX
+                "joint_actions": np.array(actions) # (B, S, 7) for WidowX
             }
             yield self._apply_kinematics(batch, "widowx")
 
@@ -186,6 +185,12 @@ class SO100DataLoader(BaseRobotDataset):
             dataset = dataset.select(range(split_idx))
             
         slice_rows = max(1, int(len(dataset) * self.sample_fraction))
+        
+        # Deadlock prevention: Ensure the slice is large enough to form at least ONE batch 
+        # (useful for --fast test runs where 5% of the val split might be < 128 frames)
+        min_required_frames = self.batch_size + self.seq_len
+        slice_rows = min(len(dataset), max(slice_rows, min_required_frames))
+        
         return dataset.shuffle(seed=42).select(range(slice_rows))
 
     def load(self, split: str = "train") -> Iterator[Dict[str, Any]]:
@@ -198,10 +203,39 @@ class SO100DataLoader(BaseRobotDataset):
             
         dataset = self._get_dataset(split)
         
-        # For HF LeRobot datasets, the video is chunked. For simplicity in this iterator,
-        # we'll read frame by frame into sliding windows.
+        # For HF LeRobot datasets, the video is chunked. 
+        # We spawn a dedicated C++ decoding thread to prevent cv2 from blocking Python.
         video_path = f"{self.offline_dir}/videos/observation.images.top/chunk-000/file-000.mp4"
         cap = cv2.VideoCapture(video_path)
+        
+        import queue
+        import threading
+        frame_queue = queue.Queue(maxsize=128)
+        shutdown_event = threading.Event()
+        
+        def video_reader():
+            try:
+                while not shutdown_event.is_set():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame_rgb = cv2.resize(frame_rgb, (256, 256))
+                    frame_rgb = frame_rgb.astype(np.float32) / 255.0
+                    
+                    # Use timeout to periodically check shutdown_event if queue is full
+                    while not shutdown_event.is_set():
+                        try:
+                            frame_queue.put(frame_rgb, timeout=0.1)
+                            break
+                        except queue.Full:
+                            continue
+            finally:
+                cap.release()
+                
+        reader_thread = threading.Thread(target=video_reader, daemon=True)
+        reader_thread.start()
         
         window_imgs = []
         window_states = []
@@ -213,43 +247,49 @@ class SO100DataLoader(BaseRobotDataset):
         
         yielded_batches = 0
         
-        for i, row in enumerate(dataset):
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_rgb = cv2.resize(frame_rgb, (256, 256))
-            frame_rgb = frame_rgb.astype(np.float32) / 255.0
-            
-            window_imgs.append(frame_rgb)
-            window_states.append(row["observation.state"])
-            window_actions.append(row["action"])
-            
-            if len(window_imgs) > self.seq_len:
-                window_imgs.pop(0)
-                window_states.pop(0)
-                window_actions.pop(0)
+        try:
+            for i, row in enumerate(dataset):
+                try:
+                    # Use timeout so we can exit gracefully if the thread dies early
+                    frame_rgb = frame_queue.get(timeout=5.0)
+                except queue.Empty:
+                    break
                 
-            if len(window_imgs) == self.seq_len:
-                batch_imgs.append(np.array(window_imgs))
-                batch_states.append(np.array(window_states))
-                batch_actions.append(np.array(window_actions))
+                window_imgs.append(frame_rgb)
+                window_states.append(row["observation.state"])
+                window_actions.append(row["action"])
                 
-                if len(batch_imgs) == self.batch_size:
-                    batch = {
-                        "image": jnp.array(batch_imgs),
-                        "joint_states": jnp.array(batch_states),
-                        "joint_actions": jnp.array(batch_actions),
-                    }
-                    yield self._apply_kinematics(batch, "so100")
-                    yielded_batches += 1
+                if len(window_imgs) > self.seq_len:
+                    window_imgs.pop(0)
+                    window_states.pop(0)
+                    window_actions.pop(0)
                     
-                    batch_imgs = []
-                    batch_states = []
-                    batch_actions = []
+                if len(window_imgs) == self.seq_len:
+                    batch_imgs.append(np.array(window_imgs))
+                    batch_states.append(np.array(window_states))
+                    batch_actions.append(np.array(window_actions))
                     
-                    if self.limit and yielded_batches >= self.limit:
-                        break
+                    if len(batch_imgs) == self.batch_size:
+                        batch = {
+                            "image": np.array(batch_imgs),
+                            "joint_states": np.array(batch_states),
+                            "joint_actions": np.array(batch_actions),
+                        }
+                        yield self._apply_kinematics(batch, "so100")
+                        yielded_batches += 1
                         
-        cap.release()
+                        batch_imgs = []
+                        batch_states = []
+                        batch_actions = []
+                        
+                        if self.limit and yielded_batches >= self.limit:
+                            break
+        finally:
+            # Guarantee graceful thread shutdown and memory cleanup
+            shutdown_event.set()
+            while not frame_queue.empty():
+                try:
+                    frame_queue.get_nowait()
+                except queue.Empty:
+                    break
+            reader_thread.join(timeout=1.0)

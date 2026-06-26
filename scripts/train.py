@@ -26,7 +26,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool 
         "masking_ratio": 0.75,     # Strong semantic reasoning pressure
         "wm_depth": 4,             # Sufficient depth for temporal prediction
         "num_heads": 16,           # Best SMAC performer
-        "batch_size": 64,          # Stable contrastive gradients
+        "batch_size": 128,         # Halved VRAM from bfloat16 AMP allows doubling batch size
         "seq_len": 6,              # Forced long-horizon temporal reasoning (No SMAC cheating)
         "activation_fn": "gelu",   # Best peak
         "learning_rate": 0.0003,

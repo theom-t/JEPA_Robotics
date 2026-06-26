@@ -2,8 +2,8 @@
 Kinematic processing module for mapping joint-space actions to 7D Cartesian task space.
 """
 import jax
-import jax.numpy as jnp
 import numpy as np
+import numpy as jnp  # Alias to reuse the same code but force execution on CPU
 
 def dh_transform(theta: jax.Array, d: float, a: float, alpha: float) -> jax.Array:
     """Computes batch 4x4 DH transformation matrices."""
