@@ -152,15 +152,34 @@ def create_steps(
         b, s, h, w, c = images.shape
         flat_images = images.reshape((b * s, h, w, c))  # (B*S, H, W, C)
 
-        # ── 1. Generate a Random Spatial Mask ────────────────────────────────
-        # Produce context_indices (visible) and target_indices (masked).
-        # The same mask is applied to every image in the batch and sequence for
-        # JIT compatibility (static shapes required).
+        # ── 1. Generate a Contiguous Spatial Mask (Block Masking) ────────────
+        # Instead of random speckling (which allows algebraic interpolation), we drop a 
+        # contiguous blob of patches. This forces the model to actually hallucinate structures.
         rng, mask_rng = jax.random.split(rng)
         rng, sigreg_rng = jax.random.split(rng)
-        shuffled = jax.random.permutation(mask_rng, num_patches)
-        context_indices = shuffled[:num_context]  # (N_context,) — visible patches
-        target_indices = shuffled[num_context:]   # (N_target,)  — masked patches
+        
+        grid_size = image_size // patch_size
+        x = jnp.arange(grid_size)
+        y = jnp.arange(grid_size)
+        xx, yy = jnp.meshgrid(x, y)
+        
+        # Pick a random center for the masked block
+        cx = jax.random.uniform(mask_rng, minval=0.0, maxval=grid_size)
+        cy = jax.random.uniform(mask_rng, minval=0.0, maxval=grid_size)
+        
+        # Calculate squared distance from center to form a circle/blob
+        distances = (xx - cx)**2 + (yy - cy)**2
+        flat_distances = distances.flatten()
+        
+        # Add tiny uniform noise to break discrete distance ties randomly
+        noise = jax.random.uniform(mask_rng, shape=flat_distances.shape, minval=0.0, maxval=0.1)
+        flat_distances = flat_distances + noise
+        
+        # Sort by distance: patches closest to the center become the TARGET (masked)
+        sorted_indices = jnp.argsort(flat_distances)
+        
+        target_indices = sorted_indices[:num_target]   # (N_target,)  — masked patches
+        context_indices = sorted_indices[num_target:]  # (N_context,) — visible patches
 
         # ── 2. Context Encoder (E_x) ─────────────────────────────────────────
         # E_x is BLIND to the masked region — it only processes context patches.

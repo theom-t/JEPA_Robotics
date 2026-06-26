@@ -8,6 +8,7 @@ import os
 import orbax.checkpoint as ocp
 import threading
 import queue
+import math
 
 class BackgroundPrefetcher:
     """Wraps an iterator in a background thread to prevent GPU starvation."""
@@ -228,11 +229,18 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         for batch_idx, (bridge_batch, so100_batch) in enumerate(pbar):
             if max_train_batches and batch_idx >= max_train_batches:
                 break
+            
+            # Calculate current tau using cosine schedule (from base tau to 1.0)
+            global_step = epoch * max_train_batches + batch_idx
+            progress = global_step / total_steps
+            cosine_decay = 0.5 * (1.0 - math.cos(math.pi * progress))  # 0.0 to 1.0
+            current_tau = tau + (1.0 - tau) * cosine_decay
+
             # Process BridgeData
-            state, metrics_b = train_step_fn(state, bridge_batch, tau)
+            state, metrics_b = train_step_fn(state, bridge_batch, current_tau)
             
             # Process SO100 (Cross-Embodiment sharing the SAME state/weights!)
-            state, metrics_s = train_step_fn(state, so100_batch, tau)
+            state, metrics_s = train_step_fn(state, so100_batch, current_tau)
             
             # Log telemetry
             avg_loss = (metrics_b["loss"] + metrics_s["loss"]) / 2.0
