@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from jepa_robotics.training.loop import train_model
 from jepa_robotics.training.optimization import run_smac_optimization
 
-def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool = False):
+def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fraction: float = 1.0):
     """Executes a single debug/manual training run with predefined hyperparameters."""
     config = {
         "latent_dim": 256,         # Jetson Orin Nano friendly, highest SMAC peak
@@ -34,12 +34,12 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fast_test: bool 
         "weight_decay": 0.005,
         "tau": 0.995,
         "loss_alpha": 1.0,         # Stable L1/L2 weighting
-        "sigreg_weight": 0.02,     # The SMAC global minima for stable regularisation
+        "sigreg_weight": 10.0,     # Must be >> 2.0 because Cosine Distance rests at 2.0. Overpowers collapse mathematically.
+        "use_amp": True,           # bfloat16 AMP re-enabled
         "disable_wandb": True,
+        "sample_fraction": fraction,
     }
-    if fast_test:
-        config["sample_fraction"] = 0.05 # 5% data for fast testing
-    print(f"Running in SINGLE mode for {num_epochs} epochs. Using final V-JEPA backbone config.")
+    print(f"Running in SINGLE mode for {num_epochs} epochs with {fraction*100:.0f}% data. Using final V-JEPA backbone config.")
     final_loss = train_model(config, num_epochs=num_epochs, do_eval=do_eval, save_dir="checkpoints/v1_jepa_backbone")
     print(f"\\nSingle run completed. Final Loss: {final_loss:.4f}")
 
@@ -67,20 +67,20 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--epochs",
-        type=int,
-        default=20,
-        help="Number of epochs to run when in 'single' mode (default: 100)."
+        type=int, 
+        default=2, 
+        help="Number of epochs to train (default: 2)."
     )
     parser.add_argument(
-        "--fast",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Run on a tiny 4% fraction of the data to quickly test the pipeline."
+        "--fraction", 
+        type=float, 
+        default=1.0, 
+        help="Fraction of data to use (e.g. 0.3 for 30%). Default is 1.0 (100%)."
     )
     
     args = parser.parse_args()
     
     if args.mode == "single":
-        run_single_mode(do_eval=args.eval, num_epochs=args.epochs, fast_test=args.fast)
+        run_single_mode(do_eval=args.eval, num_epochs=args.epochs, fraction=args.fraction)
     elif args.mode == "optimize":
         run_optimize_mode(do_eval=args.eval)

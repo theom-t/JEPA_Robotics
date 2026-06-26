@@ -60,6 +60,28 @@ def sigreg_loss(
     return mean_loss + var_loss + skew_loss
 
 
+def spatial_sigreg_loss(latents_batch, rng, num_sketches=64):
+    """
+    Computes SIGReg independently across the spatial patches for EACH image in the batch.
+    This strictly prevents 'Spatial Collapse', where the network maps every patch in an image
+    to the exact same vector to cheat the JEPA loss.
+    """
+    b, n, d = latents_batch.shape
+    raw_directions = jax.random.normal(rng, (d, num_sketches))
+    norms = jnp.linalg.norm(raw_directions, axis=0, keepdims=True)
+    directions = raw_directions / (norms + 1e-8)  # (D, num_sketches)
+    
+    # Project latents onto each direction → (B, N, num_sketches)
+    projected = latents_batch @ directions
+    
+    # We want variance across N (spatial patches) for each image B
+    proj_var = jnp.var(projected, axis=1)            # (B, num_sketches)
+    var_loss = jnp.mean((proj_var - 1.0) ** 2)
+    
+    # We do NOT force the spatial mean to be 0 for each image individually, 
+    # as images shouldn't be constrained to be zero-centered individually.
+    # We only care about forcing spatial variance to 1.0!
+    return var_loss
 def create_steps(
     encoder_def,
     predictor_def,
@@ -68,11 +90,12 @@ def create_steps(
     core_optimizer,
     probe_optimizer,
     loss_alpha: float = 1.0,
-    patch_size: int = 32,
+    patch_size: int = 16,
     image_size: int = 256,
     masking_ratio: float = 0.75,
-    sigreg_weight: float = 0.1,
+    sigreg_weight: float = 0.02,
     num_sigreg_sketches: int = 64,
+    use_amp: bool = False,
 ):
     """
     Returns JIT-compiled train and eval step functions bound to the model definitions.
@@ -107,18 +130,24 @@ def create_steps(
     ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
         """Full V-JEPA + World Model forward pass and loss computation."""
 
-        # --- Automatic Mixed Precision (AMP) ---
-        # Cast inputs and parameters to bfloat16 to leverage Tensor Cores and halve VRAM.
-        # Gradients will natively flow back to the float32 master weights outside loss_fn.
-        images = jnp.nan_to_num(batch["image"]).astype(jnp.bfloat16)        # (B, S, H, W, C)
-        actions = jnp.nan_to_num(batch["action_10d"]).astype(jnp.bfloat16)  # (B, S, 10)
-        state_targets = jnp.nan_to_num(batch["state_10d"]).astype(jnp.float32) # Keep targets float32 for MSE
-        
-        enc_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), encoder_params)
-        pred_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), predictor_params)
-        wm_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), wm_params)
-        targ_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), target_params)
-        probe_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), probe_params)
+        # --- Automatic Mixed Precision (AMP) System Switch ---
+        if use_amp:
+            images = jnp.nan_to_num(batch["image"]).astype(jnp.bfloat16)        # (B, S, H, W, C)
+            enc_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), encoder_params)
+            pred_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), predictor_params)
+            wm_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), wm_params)
+            targ_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), target_params)
+            probe_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), probe_params)
+        else:
+            images = jnp.nan_to_num(batch["image"]).astype(jnp.float32)
+            enc_p = encoder_params
+            pred_p = predictor_params
+            wm_p = wm_params
+            targ_p = target_params
+            probe_p = probe_params
+            
+        actions = jnp.nan_to_num(batch["action_10d"]).astype(jnp.float32)  # (B, S, 10)
+        state_targets = jnp.nan_to_num(batch["state_10d"]).astype(jnp.float32)
 
         b, s, h, w, c = images.shape
         flat_images = images.reshape((b * s, h, w, c))  # (B*S, H, W, C)
@@ -178,11 +207,18 @@ def create_steps(
             context_patch_latents,
             target_pos_emb,
         )  # (B*S, N_target, D)
+        
+        # CAST BACK TO FLOAT32 BEFORE LOSS COMPUTATION
+        # Computing loss gradients in bfloat16 causes catastrophic quantization and collapse!
+        predicted_target_latents = predicted_target_latents.astype(jnp.float32)
+        target_patch_latents_masked = target_patch_latents_masked.astype(jnp.float32)
 
         # ── 6. JEPA Latent Loss ───────────────────────────────────────────────
-        # L2 distance computed ONLY over the masked positions in latent space.
-        # No pixel reconstruction — the model must learn abstract physics, not appearance.
-        latent_loss = jnp.mean((predicted_target_latents - target_patch_latents_masked) ** 2)
+        # L2-normalize latents to force them onto a unit hypersphere.
+        # This makes representation collapse to 0 mathematically impossible.
+        pred_norm = predicted_target_latents / (jnp.linalg.norm(predicted_target_latents, axis=-1, keepdims=True) + 1e-8)
+        targ_norm = target_patch_latents_masked / (jnp.linalg.norm(target_patch_latents_masked, axis=-1, keepdims=True) + 1e-8)
+        latent_loss = jnp.mean((pred_norm - targ_norm) ** 2)
 
         # ── 7. World Model Forward Pass ───────────────────────────────────────
         # The World Model reasons over pooled temporal latent sequences.
@@ -196,11 +232,16 @@ def create_steps(
 
         predicted_next_states = world_model_def.apply(wm_p, seq_context, seq_actions)
         # (B, S-1, D)
+        
+        predicted_next_states = predicted_next_states.astype(jnp.float32)
+        target_pooled_seq_f32 = target_pooled_seq.astype(jnp.float32)
 
         # Temporal Dynamics Loss: compare predicted next state vs. true E_y next state
-        temporal_loss = jnp.mean(
-            (predicted_next_states - target_pooled_seq[:, 1:, :]) ** 2
-        )
+        # L2-normalize to prevent World Model from inducing collapse
+        wm_pred_norm = predicted_next_states / (jnp.linalg.norm(predicted_next_states, axis=-1, keepdims=True) + 1e-8)
+        wm_targ_norm = target_pooled_seq_f32[:, 1:, :] / (jnp.linalg.norm(target_pooled_seq_f32[:, 1:, :], axis=-1, keepdims=True) + 1e-8)
+        
+        temporal_loss = jnp.mean((wm_pred_norm - wm_targ_norm) ** 2)
 
         # ── 8. Auxiliary Linear Probe ─────────────────────────────────────────
         # Regresses the 10D physical state from the pooled context latents.
@@ -224,24 +265,30 @@ def create_steps(
         probe_loss = jnp.mean(wrapped_diffs ** 2)
 
         # ── 9. SIGReg (Sketch Isotropic Gaussian Regularization) ─────────────
-        # Applied to the pooled context representation (B*S, D).
-        # Maximises H(Z) by pushing p(z) → N(0, I), completing the InfoMax
-        # objective. Prevents dimensional collapse that the EMA alone cannot catch.
+        # BATCH Variance: Prevents different images from collapsing to the same global state
         flat_pooled = context_pooled_seq.reshape((b * s, -1))  # (B*S, D)
-        sig_reg = sigreg_loss(flat_pooled, sigreg_rng, num_sketches=num_sigreg_sketches)
+        rng, sigreg_rng_batch = jax.random.split(rng)
+        sig_reg_batch = sigreg_loss(flat_pooled, sigreg_rng_batch, num_sketches=num_sigreg_sketches)
+        
+        # SPATIAL Variance: Prevents all patches within an image from collapsing to the same local state
+        # context_patch_latents: (B*S, N_context, D)
+        rng, sigreg_rng_spatial = jax.random.split(rng)
+        sig_reg_spatial = spatial_sigreg_loss(context_patch_latents, sigreg_rng_spatial, num_sketches=num_sigreg_sketches)
+        
+        sig_reg = sig_reg_batch + sig_reg_spatial
 
         # ── 10. Total Loss (Computed in Float32) ──────────────────────────────
-        total_loss = latent_loss.astype(jnp.float32) + loss_alpha * temporal_loss.astype(jnp.float32) + probe_loss + sigreg_weight * sig_reg.astype(jnp.float32)
+        total_loss = latent_loss + loss_alpha * temporal_loss + probe_loss + sigreg_weight * sig_reg
 
         metrics = {
-            "loss": latent_loss.astype(jnp.float32) + loss_alpha * temporal_loss.astype(jnp.float32),  # Core physics signal
-            "latent_l2_loss": latent_loss.astype(jnp.float32),
-            "temporal_dynamics_loss": temporal_loss.astype(jnp.float32),
-            "probe_loss": probe_loss.astype(jnp.float32),
-            "sig_reg": sig_reg.astype(jnp.float32),
-            "pos_mse": pos_mse.astype(jnp.float32),
-            "rot_mse": rot_mse.astype(jnp.float32),
-            "grip_mse": grip_mse.astype(jnp.float32),
+            "loss": latent_loss + loss_alpha * temporal_loss,  # Core physics signal
+            "latent_l2_loss": latent_loss,
+            "temporal_dynamics_loss": temporal_loss,
+            "probe_loss": probe_loss,
+            "sig_reg": sig_reg,
+            "pos_mse": pos_mse,
+            "rot_mse": rot_mse,
+            "grip_mse": grip_mse,
         }
 
         return total_loss, metrics

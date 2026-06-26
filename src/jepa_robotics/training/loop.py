@@ -178,12 +178,14 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         "rng": rng
     }
     
+    use_amp = config.get("use_amp", False)
+    
     # 4. Compile JAX Train and Eval Steps
     train_step_fn, eval_step_fn = create_steps(
         encoder_def, predictor_def, wm_def, probe_def,
         core_optimizer, probe_optimizer, loss_alpha,
         patch_size=patch_size, image_size=image_size, masking_ratio=masking_ratio,
-        sigreg_weight=sigreg_weight,
+        sigreg_weight=sigreg_weight, use_amp=use_amp,
     )
     
     # 5. Initialize Real Dataloaders (Sliding Window & Batching)

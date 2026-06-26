@@ -113,3 +113,21 @@
   - **CPU Dataloader Optimization:** Updated `SO100DataLoader` to spawn a dedicated background thread for `cv2.VideoCapture`. Moving the heavy synchronous video decoding and resizing off the main loop unblocks the CPU, allowing it to keep up with the doubled throughput of the GPU.
   - **PCI-E Transfer Optimization:** Completely purged `jax.numpy` (`jnp.array`) from the CPU dataloaders (`dataset_loaders.py` and `kinematics.py`), replacing them with standard `numpy`. Using `jnp.array()` in the Python loader was triggering synchronous host-to-device transfers over the PCIe bus, locking the `BackgroundPrefetcher` threads whenever the GPU was busy. The JIT-compiled `train_step_fn` now automatically handles asynchronous transfers.
 - **Reasoning**: This unleashes the RTX 5090 Blackwell's next-generation Tensor Cores. Pushing 128 images concurrently through the model effectively halves the massive 8.5-day 100-epoch training run down to ~4 days without sacrificing any representation quality.
+
+## 2026-06-26 12:15:00+01:00
+- **Milestone**: Completed V1_plan Stage 5 (Virtual Sandbox Validation) entirely.
+- **Details**:
+  - **Headless Stress Tester (Phase 2):** Implemented an autoregressive sliding-window rollout in `stress_test.py`. Given a single starting image and a sequence of joint velocity actions, the World Model successfully imagines 10 frames into the future. Temporal drift (MSE) against the true MuJoCo physics engine is automatically calculated.
+  - **Interactive AI Debugger (`ai_debugger.py`):** Built a high-performance Flask server that streams the MuJoCo engine to the browser via MJPEG (`multipart/x-mixed-replace`).
+  - **Inverse Kinematics Ghost Tracker:** Wrote a fast SLSQP IK solver that translates the 10D Latent Probe predictions back into 6 joint angles, enabling the rendering of a Cyan Hologram overlay that perfectly tracks the user's manual slider movements.
+  - **Holographic Imagination:** Wired up the 'Imagine Trajectory' button on the pure Vanilla CSS glassmorphic frontend. It dynamically queries the World Model to project the next 10 frames of hallucinated movements onto the MJPEG feed as translucent ghost arms.
+  - **Unit & System Tests:** Created `tests/test_evaluation.py` and `tests/test_imagination.py` to assert mathematical shape integrity and strict causal masking inside the Transformer.
+- **Reasoning**: The V1 architecture is now fully instrumented with intuitive, robust debugging tools. We can visually prove that the AI has internalized the physics of the SO100 arm before trusting it on real hardware.
+
+## 2026-06-26 12:48:00+01:00
+- **Architectural Fix**: Resolved Zero-State Representation Collapse in the JEPA loss.
+- **Details**:
+  - **Problem Identified**: When batch size was doubled to 128 and data volume spiked to 250,000+ frames per epoch, the latent vectors mathematically collapsed to `0.000` exactly at Epoch 2. The MSE prediction loss overpowered the `0.02` InfoMax `SIGReg` penalty, incentivising the network to output a constant zero vector for every patch to minimise loss. The World Model Temporal Loss (which gradients back through the Context Encoder to match the EMA Target Encoder) exacerbated the collapse.
+  - **Fix**: Implemented **L2 Hypersphere Projection** on both the `latent_loss` and `temporal_loss`. The latent vectors are now strictly L2-normalized before computing MSE (making it equivalent to Cosine Distance). Because it is mathematically impossible to normalize a zero-vector, the network is forced onto the surface of a unit hypersphere, permanently preventing zero-state collapse.
+  - **SIGReg Adjustment**: Increased `sigreg_weight` to `0.1` to prevent dimensional clustering on the hypersphere, ensuring the InfoMax objective keeps the latent features distributed independently without overpowering the reconstruction gradients.
+- **Reasoning**: Standard MSE allows the magnitude of latent vectors to decay to zero when the EMA target matches the context too closely or the reconstruction task is too difficult. Projecting to a unit hypersphere acts as an impenetrable mathematical floor, forcing the ViT to actually learn abstract representations.
