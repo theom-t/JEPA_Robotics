@@ -17,6 +17,7 @@ import jax
 import jax.numpy as jnp
 from jepa_robotics.models.v_jepa import ViTEncoder, StateLinearProbe
 from jepa_robotics.evaluation.mujoco_env import SO100SimEnv, SO100GhostEnv
+from jepa_robotics.evaluation.ik_solver import IKSolver
 from jepa_robotics.models.world_model import ActionConditionedTransformer
 from jepa_robotics.data.kinematics import forward_kinematics
 import flax.serialization
@@ -42,16 +43,24 @@ imagination_trigger = False
 @jax.jit
 def perceive(img):
     _, pooled = encoder_def.apply({'params': loaded_state['encoder_params']['params']}, img, patch_indices=None)
-    pred_10d = probe_def.apply({'params': loaded_state['probe_params']}, pooled)
+    pred_10d = probe_def.apply({'params': loaded_state['probe_params']['params']}, pooled)
     return pooled, pred_10d
 
 @jax.jit
 def imagine_step(seq_context, seq_actions):
-    next_states = wm_def.apply({'params': loaded_state['wm_params']}, seq_context, seq_actions)
+    next_states = wm_def.apply({'params': loaded_state['wm_params']['params']}, seq_context, seq_actions)
     return next_states[:, -1:, :]
 
-def generate_frames():
-    global current_joints, context_buffer, action_buffer, imagination_trigger
+latest_frame = None
+
+def render_loop():
+    global current_joints, context_buffer, action_buffer, imagination_trigger, latest_frame
+    global env, ghost_env, ik_solver
+    
+    print("[INFO] Initializing MuJoCo Environments in Background Thread...")
+    env = SO100SimEnv()
+    ghost_env = SO100GhostEnv()
+    ik_solver = IKSolver()
     
     while True:
         if not weights_loaded:
@@ -81,8 +90,6 @@ def generate_frames():
             context_buffer = jnp.concatenate([context_buffer[:, 1:, :], latent_state], axis=1)
             action_buffer = jnp.concatenate([action_buffer[:, 1:, :], action_expanded], axis=1)
             
-        # If user clicked Imagine, we hallucinate 10 frames into the future
-        blended_float = real_img_float
         if imagination_trigger:
             sim_context = context_buffer
             sim_action = action_buffer
@@ -95,14 +102,25 @@ def generate_frames():
                 sim_action = jnp.concatenate([sim_action[:, 1:, :], img_action_expanded], axis=1)
                 
                 next_latent = imagine_step(sim_context, sim_action)
-                pred_ghost_10d = probe_def.apply({'params': loaded_state['probe_params']}, next_latent[0])[0]
+                pred_ghost_10d = probe_def.apply({'params': loaded_state['probe_params']['params']}, next_latent[0])[0]
                 
                 ghost_joints = ik_solver.solve(np.array(pred_ghost_10d), initial_guess=imagined_joints)
-                blended_float = ghost_env.overlay_ghost(blended_float, ghost_joints)
                 
+                # Render just this single imagined step
+                blended_step = ghost_env.overlay_ghost(real_img_float, ghost_joints)
+                
+                # Instantly encode and publish the frame to create an animation!
+                bgr_step = cv2.cvtColor((blended_step * 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
+                ret_step, buffer_step = cv2.imencode('.jpg', bgr_step, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                latest_frame = (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer_step.tobytes() + b'\r\n')
+                
+                # Advance context
                 sim_context = jnp.concatenate([sim_context[:, 1:, :], next_latent], axis=1)
+                time.sleep(0.1) # 10fps playback
                 
             imagination_trigger = False
+            time.sleep(1.0) # Pause at the end for 1s so the user can see it
+            continue
         else:
             # Standard Real-time Ghost
             ghost_joints = ik_solver.solve(np.array(pred_10d), initial_guess=current_joints)
@@ -115,9 +133,16 @@ def generate_frames():
         ret, buffer = cv2.imencode('.jpg', bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         frame = buffer.tobytes()
         
-        # Yield multipart HTTP response for MJPEG streaming
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        latest_frame = (b'--frame\r\n'
+                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        time.sleep(0.01)
+
+def generate_frames():
+    global latest_frame
+    while True:
+        if latest_frame is not None:
+            yield latest_frame
+        time.sleep(0.03)
 
 @app.route('/')
 def index():
@@ -141,17 +166,12 @@ def imagine_trajectory():
     return jsonify({"status": "ok"})
 
 def start_server():
-    global env, ghost_env, ik_solver, encoder_def, probe_def, wm_def, loaded_state, weights_loaded
-    
-    print("[INFO] Initializing MuJoCo Environments...")
-    env = SO100SimEnv()
-    ghost_env = SO100GhostEnv()
-    ik_solver = IKSolver()
+    global encoder_def, probe_def, wm_def, loaded_state, weights_loaded
     
     weights_path = "/home/tmainetucker/Repos/JEPA_Robotics/checkpoints/v1_jepa_backbone/v1_weights.msgpack"
     if os.path.exists(weights_path):
         print("[INFO] Loading V-JEPA Weights...")
-        encoder_def = ViTEncoder(latent_dim=256, depth=7, num_heads=16, patch_size=16, activation_fn="gelu")
+        encoder_def = ViTEncoder(latent_dim=256, depth=4, num_heads=16, patch_size=16, activation_fn="gelu")
         probe_def = StateLinearProbe(out_dim=10)
         wm_def = ActionConditionedTransformer(latent_dim=256, depth=4, num_heads=16, activation_fn="gelu")
         
@@ -163,6 +183,8 @@ def start_server():
     else:
         print(f"[WARNING] {weights_path} not found. Waiting for training to finish...")
         print("[INFO] Server will start, but MJPEG stream will hang until weights are available.")
+    t = threading.Thread(target=render_loop, daemon=True)
+    t.start()
         
     app.run(host='0.0.0.0', port=5000, threaded=True)
 

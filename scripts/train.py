@@ -34,7 +34,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fraction: float 
         "weight_decay": 0.005,
         "tau": 0.995,
         "loss_alpha": 1.0,         # Stable L1/L2 weighting
-        "sigreg_weight": 0.02,     # Reverted to the exact optimal value empirically discovered by SMAC3.
+        "sigreg_weight": 10.0,     # Increased to 10.0 (VICReg standard) to fiercely prevent Positional Collapse
         "use_amp": True,           # bfloat16 AMP re-enabled
         "disable_wandb": True,
         "sample_fraction": fraction,
@@ -47,11 +47,12 @@ def run_optimize_mode(do_eval: bool = True):
     """Executes the SMAC3 Optimization Loop to discover the Pareto Front."""
     print("Running in OPTIMIZE mode via SMAC3.")
     incumbent = run_smac_optimization(do_eval=do_eval)
-    print("\\nOptimization Sweep Complete.")
+    print("\nOptimization Sweep Complete.")
     print(f"Discovered Optimal Configuration: {incumbent}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="JEPA Robotics Dual-Mode Training Orchestrator")
+    parser.add_argument("--sigreg", type=float, default=10.0, help="SIGReg info-max weight")
     parser.add_argument(
         "--mode", 
         type=str, 

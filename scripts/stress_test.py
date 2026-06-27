@@ -16,11 +16,12 @@ import json
 from jepa_robotics.evaluation.mujoco_env import SO100SimEnv
 from jepa_robotics.models.v_jepa import ViTEncoder, StateLinearProbe
 from jepa_robotics.models.world_model import ActionConditionedTransformer
+from jepa_robotics.data.kinematics import forward_kinematics
 
 # V1 Config Baseline
 CONFIG = {
     "latent_dim": 256,
-    "vit_depth": 7,
+    "vit_depth": 4,
     "patch_size": 16,
     "wm_depth": 4,
     "num_heads": 16,
@@ -59,7 +60,7 @@ def run_perception_stress_test(env, encoder_def, probe_def, loaded_state, num_tr
         # We pass the full image through the context encoder (no masking) 
         # to match how the probe was gradient-attached during training.
         _, pooled = encoder_def.apply({'params': loaded_state['encoder_params']['params']}, img, patch_indices=None)
-        pred_10d = probe_def.apply({'params': loaded_state['probe_params']}, pooled)
+        pred_10d = probe_def.apply({'params': loaded_state['probe_params']['params']}, pooled)
         return pred_10d
         
     baseline_mses = []
@@ -126,13 +127,13 @@ def run_imagination_test(env, encoder_def, wm_def, probe_def, loaded_state, num_
     def imagine_step(seq_context, seq_actions):
         # The World Model expects exactly 5 frames of history due to its positional embeddings
         # seq_context: (B, 5, D), seq_actions: (B, 5, 10)
-        next_states = wm_def.apply({'params': loaded_state['wm_params']}, seq_context, seq_actions)
+        next_states = wm_def.apply({'params': loaded_state['wm_params']['params']}, seq_context, seq_actions)
         # Returns (B, 5, D) predictions. The very last one is the state at t+1.
         return next_states[:, -1:, :]
         
     @jax.jit
     def decode(pooled):
-        return probe_def.apply({'params': loaded_state['probe_params']}, pooled)
+        return probe_def.apply({'params': loaded_state['probe_params']['params']}, pooled)
 
     drift_errors = []
     

@@ -210,11 +210,17 @@ def create_steps(
         # Computing loss gradients in bfloat16 causes catastrophic quantization and collapse!
         predicted_target_latents = predicted_target_latents.astype(jnp.float32)
         target_patch_latents_masked = target_patch_latents_masked.astype(jnp.float32)
+        
+        # CRITICAL: L2 Hypersphere Normalization + Cosine Distance.
+        # We CANNOT use MSE(pred_norm, targ_norm) because if the network outputs 0.0, 
+        # MSE(0,0) = 0.0, which tricks the optimizer into thinking the collapse is a perfect solution.
+        # Cosine distance yields 2.0 (maximum error) for zero vectors, fiercely punishing collapse!
+        pred_norm = predicted_target_latents / jnp.maximum(jnp.linalg.norm(predicted_target_latents, axis=-1, keepdims=True), 1e-12)
+        targ_norm = target_patch_latents_masked / jnp.maximum(jnp.linalg.norm(target_patch_latents_masked, axis=-1, keepdims=True), 1e-12)
 
         # ── 6. JEPA Latent Loss ───────────────────────────────────────────────
-        # Standard MSE loss between predicted and target latents.
-        # We rely on EMA target freezing (tau -> 1.0) to prevent the network from shrinking to 0.0.
-        latent_loss = jnp.mean((predicted_target_latents - target_patch_latents_masked) ** 2)
+        # Cosine distance: 2 - 2 * (a · b). Minimum is 0.0 (perfect alignment).
+        latent_loss = jnp.mean(2.0 - 2.0 * jnp.sum(pred_norm * targ_norm, axis=-1))
 
         # ── 7. World Model Forward Pass ───────────────────────────────────────
         # The World Model reasons over pooled temporal latent sequences.
@@ -231,9 +237,12 @@ def create_steps(
         
         predicted_next_states = predicted_next_states.astype(jnp.float32)
         target_pooled_seq_f32 = target_pooled_seq.astype(jnp.float32)
+        
+        pred_wm_norm = predicted_next_states / jnp.maximum(jnp.linalg.norm(predicted_next_states, axis=-1, keepdims=True), 1e-12)
+        targ_wm_norm = target_pooled_seq_f32[:, 1:, :] / jnp.maximum(jnp.linalg.norm(target_pooled_seq_f32[:, 1:, :], axis=-1, keepdims=True), 1e-12)
 
         # Temporal Dynamics Loss: compare predicted next state vs. true E_y next state
-        temporal_loss = jnp.mean((predicted_next_states - target_pooled_seq_f32[:, 1:, :]) ** 2)
+        temporal_loss = jnp.mean(2.0 - 2.0 * jnp.sum(pred_wm_norm * targ_wm_norm, axis=-1))
 
         # ── 8. Auxiliary Linear Probe ─────────────────────────────────────────
         # Regresses the 10D physical state from the pooled context latents.
