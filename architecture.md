@@ -37,11 +37,16 @@ This document tracks the high-level software architecture for the Cross-Embodime
 *   **Goal:** Navigate the highly complex, hierarchical search space of our dual-engine architecture.
 *   **Validation Pareto Front:** SMAC3 continuously balances the models against a dual-objective metric: minimizing Latent/Temporal loss while simultaneously minimizing Forward Pass Latency to ensure it meets edge robotics bounds (30Hz+).
 
-## 5. Hardware & Environment
-*   **Training:** Local NVIDIA RTX 5090 (Blackwell architecture). Requires JAX `0.6.2` via `pip` (CUDA 12.8 compatible).
+## 6. Hardware & Environment
+*   **Training:** Local NVIDIA RTX 5090 (Blackwell architecture). Requires JAX `0.6.2` via `pip` (CUDA 12.8 compatible). No `conda` CUDA binaries.
 *   **Edge Inference:** NVIDIA Jetson Orin Nano (NVMe boot).
 
-## 6. Testing & Verification Protocol
+## 7. Testing & Verification Protocol
 *   **Framework:** `pytest` is the mandated testing framework for all modules.
 *   **Directory:** All tests reside in the `tests/` directory mirroring the `src/` layout.
 *   **Coverage:** `pytest-cov` should be used to monitor coverage on JAX tensor operations and mathematical boundaries.
+
+## 8. Training Infrastructure & Evaluation
+*   **Resumable Checkpointing:** The training loop serializes the full JAX PyTree (including `optax` momentum tensors, PRNG keys, and epoch count) into a monolithic `checkpoint.msgpack` at the end of every epoch, allowing massive runs to be paused and seamlessly resumed.
+*   **Interactive AI Debugger:** A Flask-based web dashboard (`ai_debugger.py`) running a background EGL rendering daemon allows researchers to manipulate the MuJoCo simulated robot via sliders and visually interrogate the ViT's Latent representations and World Model's sequential hallucinations via inverse-kinematics holograms.
+*   **Headless Stress Tester:** An automated test harness (`stress_test.py`) that quantitatively measures ViT spatial collapse against true 10D Cartesian ground truth and tracks temporal drift (MSE) across the World Model's autoregressive hallucination sequences.

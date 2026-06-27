@@ -155,3 +155,13 @@
   - **Reverted `vit_depth` to 4 (`train.py`)**: The manual override to 7 layers was causing significant gradient instability. Reverted to the highly stable depth of 4 empirically proven by the SMAC sweep.
   - **Reverted `sigreg_weight` to 0.02 (`train.py`)**: Even our "lowered" value of `0.5` was 25x stronger than the SMAC optimal `0.02`. This excessive variance pressure was causing the initial gradient explosions that killed the GELU activations.
 - **Reasoning**: By combining the un-hackable anti-collapse mechanisms of V-JEPA (EMA Target Freeze + Block Masking) with the highly stable hyperparameter baseline discovered by SMAC3, we have successfully boxed the architecture into a mathematically sound, self-recovering state.
+
+## 2026-06-27 21:00:00+01:00
+- **Milestone**: Full 100-Epoch Backbone Run Initiated & System Hardening.
+- **Details**:
+  - Implemented fully resumable training checkpoints in `loop.py` that serialize the complete JAX PyTree (including optax momentum tensors, epoch, and PRNG states) to `checkpoint.msgpack`.
+  - Refactored `ai_debugger.py` to decouple the OpenGL EGL rendering context from the Flask worker threads via a background daemon, perfectly resolving thread-bound EGL crash conditions.
+  - Implemented 10 FPS hallucinated sequential animation in the AI Debugger frontend to accurately and visually validate World Model temporal drift.
+  - Finalized the `V2_plan.md` architectural blueprint, introducing Language-Conditioned Behavior Cloning (LC-BC) by leveraging existing semantic tagging in Open-X datasets (BridgeData V2 / SO100).
+  - Validated Headless Stress Tester metrics, confirming the World Model correctly internalizes momentum and physical inertia (solving the "Temporal Shock" testing artifact).
+- **Reasoning**: The training pipeline is now completely stabilized, interruptible, and mathematically sound. The 100-epoch, 100%-data foundation training run is actively executing on the RTX 5090 to synthesize the core visual cortex that will power the autonomous V2 Language-Conditioned Robot.
