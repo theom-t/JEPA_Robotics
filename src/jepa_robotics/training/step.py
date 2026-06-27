@@ -211,11 +211,9 @@ def create_steps(
         target_patch_latents_masked = target_patch_latents_masked.astype(jnp.float32)
 
         # ── 6. JEPA Latent Loss ───────────────────────────────────────────────
-        # L2-normalize latents to force them onto a unit hypersphere.
-        # This makes representation collapse to 0 mathematically impossible.
-        pred_norm = predicted_target_latents / (jnp.linalg.norm(predicted_target_latents, axis=-1, keepdims=True) + 1e-8)
-        targ_norm = target_patch_latents_masked / (jnp.linalg.norm(target_patch_latents_masked, axis=-1, keepdims=True) + 1e-8)
-        latent_loss = jnp.mean((pred_norm - targ_norm) ** 2)
+        # Standard MSE loss between predicted and target latents.
+        # We rely on EMA target freezing (tau -> 1.0) to prevent the network from shrinking to 0.0.
+        latent_loss = jnp.mean((predicted_target_latents - target_patch_latents_masked) ** 2)
 
         # ── 7. World Model Forward Pass ───────────────────────────────────────
         # The World Model reasons over pooled temporal latent sequences.
@@ -234,11 +232,7 @@ def create_steps(
         target_pooled_seq_f32 = target_pooled_seq.astype(jnp.float32)
 
         # Temporal Dynamics Loss: compare predicted next state vs. true E_y next state
-        # L2-normalize to prevent World Model from inducing collapse
-        wm_pred_norm = predicted_next_states / (jnp.linalg.norm(predicted_next_states, axis=-1, keepdims=True) + 1e-8)
-        wm_targ_norm = target_pooled_seq_f32[:, 1:, :] / (jnp.linalg.norm(target_pooled_seq_f32[:, 1:, :], axis=-1, keepdims=True) + 1e-8)
-        
-        temporal_loss = jnp.mean((wm_pred_norm - wm_targ_norm) ** 2)
+        temporal_loss = jnp.mean((predicted_next_states - target_pooled_seq_f32[:, 1:, :]) ** 2)
 
         # ── 8. Auxiliary Linear Probe ─────────────────────────────────────────
         # Regresses the 10D physical state from the pooled context latents.

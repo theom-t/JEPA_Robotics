@@ -21,7 +21,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fraction: float 
     """Executes a single debug/manual training run with predefined hyperparameters."""
     config = {
         "latent_dim": 256,         # Jetson Orin Nano friendly, highest SMAC peak
-        "vit_depth": 7,            # Deep ViT (Sobol winners used 7)
+        "vit_depth": 4,            # SMAC proved depth 4 is highly stable. 7 was causing gradient explosions.
         "patch_size": 16,          # High spatial acuity for robot manipulation
         "masking_ratio": 0.75,     # Strong semantic reasoning pressure
         "wm_depth": 4,             # Sufficient depth for temporal prediction
@@ -34,7 +34,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fraction: float 
         "weight_decay": 0.005,
         "tau": 0.995,
         "loss_alpha": 1.0,         # Stable L1/L2 weighting
-        "sigreg_weight": 0.5,      # Backed down to 0.5 to prevent Explosive Dead-GELU Collapse.
+        "sigreg_weight": 0.02,     # Reverted to the exact optimal value empirically discovered by SMAC3.
         "use_amp": True,           # bfloat16 AMP re-enabled
         "disable_wandb": True,
         "sample_fraction": fraction,
