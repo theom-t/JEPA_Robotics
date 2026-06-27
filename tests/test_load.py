@@ -1,13 +1,13 @@
 import flax.serialization
 import sys
 import os
+import pytest
 
 def test_load():
     msgpack_path = "/home/tmainetucker/Repos/JEPA_Robotics/checkpoints/v1_jepa_backbone/v1_weights.msgpack"
     
     if not os.path.exists(msgpack_path):
-        print(f"❌ File not found at {msgpack_path}")
-        sys.exit(1)
+        pytest.skip(f"File not found at {msgpack_path}. Run training first.")
 
     print(f"Loading weights from {msgpack_path}...")
     
@@ -39,8 +39,7 @@ def test_load():
             print("  Warning: No 'params' sub-key found in encoder. Structure might be different than expected.")
 
     except Exception as e:
-        print(f"\n❌ Failed to load weights: {e}")
-        sys.exit(1)
+        pytest.fail(f"Failed to load weights: {e}")
 
 if __name__ == "__main__":
     test_load()

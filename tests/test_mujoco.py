@@ -4,14 +4,14 @@ os.environ["MUJOCO_GL"] = "egl"
 import mujoco
 import numpy as np
 import cv2
+import pytest
 
 def test_mujoco_render():
     # Use the scene file which contains the robot, lighting, and cameras
     xml_path = "/home/tmainetucker/Repos/JEPA_Robotics/data/mujoco_assets/so101/scene.xml"
     
     if not os.path.exists(xml_path):
-        print(f"Error: Could not find {xml_path}")
-        return
+        pytest.skip(f"Could not find {xml_path}")
 
     print("Loading MuJoCo model...")
     # Load model and data
