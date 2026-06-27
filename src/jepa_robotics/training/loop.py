@@ -176,8 +176,22 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
         "target_params": target_params,
         "core_opt_state": core_opt_state,
         "probe_opt_state": probe_opt_state,
-        "rng": rng
+        "rng": rng,
+        "epoch": 0
     }
+    
+    start_epoch = 0
+    if save_dir is not None:
+        ckpt_path = os.path.join(save_dir, "checkpoint.msgpack")
+        if os.path.exists(ckpt_path):
+            print(f"[INFO] Resuming training from {ckpt_path}...")
+            import flax.serialization
+            with open(ckpt_path, "rb") as f:
+                ckpt_bytes = f.read()
+            # Deserialize into the initialized state tree to preserve correct JAX types
+            state = flax.serialization.from_bytes(state, ckpt_bytes)
+            start_epoch = state.get("epoch", 0)
+            print(f"[INFO] Resumed successfully. Starting at Epoch {start_epoch+1}")
     
     use_amp = config.get("use_amp", False)
     
@@ -217,7 +231,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
                                    f"The dataset slice is too small to form a single batch of size {loader.batch_size}. "
                                    f"This would cause an infinite loop in the background thread.")
 
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         # Cap prefetch at 16. Each uint8 batch is ~150 MB. 
         # A queue of 16 holds ~2.4 GB per dataloader, providing a massive buffer against CPU latency spikes!
         bridge_iter = BackgroundPrefetcher(bridge_loader.load(split="train"), max_prefetch=16)
@@ -328,30 +342,32 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             final_loss = weighted_probe_score
             
             # Early stopping: if the loss diverges to NaN, instantly abort the trial
-            # and return a massive penalty so SMAC learns not to use this learning rate
             if np.isnan(final_loss):
                 print("\n[WARNING] Loss diverged to NaN. Aborting trial early to save compute.\n")
                 return 999.0
             
-    if save_dir is not None:
-        print(f"\n[INFO] Saving final model checkpoint to {save_dir}...")
-        os.makedirs(save_dir, exist_ok=True)
-        
-        save_state = {
-            "encoder_params": state["encoder_params"],
-            "predictor_params": state["predictor_params"],
-            "wm_params": state["wm_params"],
-            "probe_params": state["probe_params"]
-        }
-        
-        # Orbax can crash on JAX nightlies due to internal API changes. 
-        # Using standard flax serialization instead.
-        import flax.serialization
-        save_path = os.path.join(save_dir, "v1_weights.msgpack")
-        with open(save_path, "wb") as f:
-            f.write(flax.serialization.to_bytes(save_state))
+        state["epoch"] = epoch + 1
+        if save_dir is not None:
+            os.makedirs(save_dir, exist_ok=True)
+            import flax.serialization
             
-        print(f"[INFO] Model successfully saved to {save_path}!\n")
+            # Save the full training state for resumption
+            ckpt_path = os.path.join(save_dir, "checkpoint.msgpack")
+            with open(ckpt_path, "wb") as f:
+                f.write(flax.serialization.to_bytes(state))
+                
+            # Keep saving the raw model weights separately for evaluation scripts
+            save_state = {
+                "encoder_params": state["encoder_params"],
+                "predictor_params": state["predictor_params"],
+                "wm_params": state["wm_params"],
+                "probe_params": state["probe_params"]
+            }
+            weights_path = os.path.join(save_dir, "v1_weights.msgpack")
+            with open(weights_path, "wb") as f:
+                f.write(flax.serialization.to_bytes(save_state))
+            
+            print(f"[INFO] Checkpoint saved successfully for Epoch {epoch+1}")
             
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)
