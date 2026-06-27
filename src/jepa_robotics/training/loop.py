@@ -218,10 +218,10 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
                                    f"This would cause an infinite loop in the background thread.")
 
     for epoch in range(num_epochs):
-        # Cap prefetch at 2. Each float32 batch is ~603 MB. 
-        # A queue of 8 would hold almost 5 GB per dataloader!
-        bridge_iter = BackgroundPrefetcher(bridge_loader.load(split="train"), max_prefetch=2)
-        so100_iter = BackgroundPrefetcher(cycle_loader(so100_loader, split="train"), max_prefetch=2)
+        # Cap prefetch at 16. Each uint8 batch is ~150 MB. 
+        # A queue of 16 holds ~2.4 GB per dataloader, providing a massive buffer against CPU latency spikes!
+        bridge_iter = BackgroundPrefetcher(bridge_loader.load(split="train"), max_prefetch=16)
+        so100_iter = BackgroundPrefetcher(cycle_loader(so100_loader, split="train"), max_prefetch=16)
         
         epoch_losses = []
         pbar = tqdm(zip(bridge_iter, so100_iter), desc=f"Epoch {epoch+1}/{num_epochs}", unit="batch", total=max_train_batches)
@@ -247,21 +247,26 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             epoch_losses.append(avg_loss)
             
             # Log telemetry locally via tqdm instead of spamming print statements
-            avg_pos_mse = (metrics_b["pos_mse"] + metrics_s["pos_mse"]) / 2.0
-            avg_rot_mse = (metrics_b["rot_mse"] + metrics_s["rot_mse"]) / 2.0
-            avg_grip_mse = (metrics_b["grip_mse"] + metrics_s["grip_mse"]) / 2.0
-            
-            pbar.set_postfix({
-                "Avg L": f"{avg_loss:.3f}",
-                "Pos": f"{avg_pos_mse:.3f}",
-                "Rot": f"{avg_rot_mse:.3f}",
-                "Grp": f"{avg_grip_mse:.3f}"
-            })
+            # CRITICAL PERFORMANCE FIX: We only format the string every 25 batches.
+            # Formatting a JAX array forces a host-device sync (blocks the Python thread until the GPU finishes).
+            # By skipping this 24 out of 25 times, JAX can asynchronously enqueue dozens of batches 
+            # to the GPU without waiting, allowing the RTX 5090 to stay pegged at 100% utilization.
+            if batch_idx % 25 == 0:
+                avg_pos_mse = (metrics_b["pos_mse"] + metrics_s["pos_mse"]) / 2.0
+                avg_rot_mse = (metrics_b["rot_mse"] + metrics_s["rot_mse"]) / 2.0
+                avg_grip_mse = (metrics_b["grip_mse"] + metrics_s["grip_mse"]) / 2.0
+                
+                pbar.set_postfix({
+                    "Avg L": f"{avg_loss:.3f}",
+                    "Pos": f"{avg_pos_mse:.3f}",
+                    "Rot": f"{avg_rot_mse:.3f}",
+                    "Grp": f"{avg_grip_mse:.3f}"
+                })
             
         final_loss = np.mean(epoch_losses)
         bridge_iter.close()
         so100_iter.close()
-        print(f"\\n✅ Epoch {epoch+1} Train Completed - Avg Loss: {final_loss:.4f}\\n")
+        print(f"\n✅ Epoch {epoch+1} Train Completed - Avg Loss: {final_loss:.4f}\n")
         
         if do_eval:
             val_epoch_losses = []
@@ -269,8 +274,8 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             val_rot_mses = []
             val_grip_mses = []
             
-            bridge_val_iter = BackgroundPrefetcher(bridge_val_loader.load(split="val"), max_prefetch=2)
-            so100_val_iter = BackgroundPrefetcher(cycle_loader(so100_val_loader, split="val"), max_prefetch=2)
+            bridge_val_iter = BackgroundPrefetcher(bridge_val_loader.load(split="val"), max_prefetch=16)
+            so100_val_iter = BackgroundPrefetcher(cycle_loader(so100_val_loader, split="val"), max_prefetch=16)
             
             pbar_val = tqdm(zip(bridge_val_iter, so100_val_iter), desc=f"Epoch {epoch+1} Validation", unit="batch", total=max_val_batches)
             for batch_idx_val, (bridge_val_batch, so100_val_batch) in enumerate(pbar_val):

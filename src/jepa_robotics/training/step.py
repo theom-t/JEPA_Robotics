@@ -110,14 +110,15 @@ def create_steps(
 
         # --- Automatic Mixed Precision (AMP) System Switch ---
         if use_amp:
-            images = jnp.nan_to_num(batch["image"]).astype(jnp.bfloat16)        # (B, S, H, W, C)
+            # Transfer as uint8, convert to bfloat16, then divide by 255.0 ON THE GPU.
+            images = (jnp.nan_to_num(batch["image"]).astype(jnp.bfloat16)) / 255.0        # (B, S, H, W, C)
             enc_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), encoder_params)
             pred_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), predictor_params)
             wm_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), wm_params)
             targ_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), target_params)
             probe_p = jax.tree_util.tree_map(lambda x: x.astype(jnp.bfloat16), probe_params)
         else:
-            images = jnp.nan_to_num(batch["image"]).astype(jnp.float32)
+            images = (jnp.nan_to_num(batch["image"]).astype(jnp.float32)) / 255.0
             enc_p = encoder_params
             pred_p = predictor_params
             wm_p = wm_params
