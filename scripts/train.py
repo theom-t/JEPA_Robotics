@@ -34,7 +34,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fraction: float 
         "weight_decay": 0.005,
         "tau": 0.995,
         "loss_alpha": 1.0,         # Stable L1/L2 weighting
-        "sigreg_weight": 10.0,     # Must be >> 2.0 because Cosine Distance rests at 2.0. Overpowers collapse mathematically.
+        "sigreg_weight": 0.5,      # Backed down to 0.5 to prevent Explosive Dead-GELU Collapse.
         "use_amp": True,           # bfloat16 AMP re-enabled
         "disable_wandb": True,
         "sample_fraction": fraction,

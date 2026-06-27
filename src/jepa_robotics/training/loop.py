@@ -153,12 +153,12 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     )
     
     core_optimizer = optax.chain(
-        optax.clip(10.0), # Safe scalar clipping. Global norm squaring can cause float32 'inf' overflows
+        optax.clip(1.0), # Tightened to 1.0 to prevent explosive Dead-GELU death
         optax.zero_nans(),
         optax.adamw(learning_rate=core_lr_schedule, weight_decay=weight_decay)
     )
     probe_optimizer = optax.chain(
-        optax.clip(10.0),
+        optax.clip(1.0),
         optax.zero_nans(),
         optax.adamw(learning_rate=probe_lr_schedule, weight_decay=0.0)
     )
@@ -231,7 +231,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
                 break
             
             # Calculate current tau using cosine schedule (from base tau to 1.0)
-            global_step = epoch * max_train_batches + batch_idx
+            global_step = epoch * estimated_batches_per_epoch + batch_idx
             progress = global_step / total_steps
             cosine_decay = 0.5 * (1.0 - math.cos(math.pi * progress))  # 0.0 to 1.0
             current_tau = tau + (1.0 - tau) * cosine_decay

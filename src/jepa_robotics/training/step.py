@@ -60,28 +60,6 @@ def sigreg_loss(
     return mean_loss + var_loss + skew_loss
 
 
-def spatial_sigreg_loss(latents_batch, rng, num_sketches=64):
-    """
-    Computes SIGReg independently across the spatial patches for EACH image in the batch.
-    This strictly prevents 'Spatial Collapse', where the network maps every patch in an image
-    to the exact same vector to cheat the JEPA loss.
-    """
-    b, n, d = latents_batch.shape
-    raw_directions = jax.random.normal(rng, (d, num_sketches))
-    norms = jnp.linalg.norm(raw_directions, axis=0, keepdims=True)
-    directions = raw_directions / (norms + 1e-8)  # (D, num_sketches)
-    
-    # Project latents onto each direction → (B, N, num_sketches)
-    projected = latents_batch @ directions
-    
-    # We want variance across N (spatial patches) for each image B
-    proj_var = jnp.var(projected, axis=1)            # (B, num_sketches)
-    var_loss = jnp.mean((proj_var - 1.0) ** 2)
-    
-    # We do NOT force the spatial mean to be 0 for each image individually, 
-    # as images shouldn't be constrained to be zero-centered individually.
-    # We only care about forcing spatial variance to 1.0!
-    return var_loss
 def create_steps(
     encoder_def,
     predictor_def,
@@ -287,14 +265,7 @@ def create_steps(
         # BATCH Variance: Prevents different images from collapsing to the same global state
         flat_pooled = context_pooled_seq.reshape((b * s, -1))  # (B*S, D)
         rng, sigreg_rng_batch = jax.random.split(rng)
-        sig_reg_batch = sigreg_loss(flat_pooled, sigreg_rng_batch, num_sketches=num_sigreg_sketches)
-        
-        # SPATIAL Variance: Prevents all patches within an image from collapsing to the same local state
-        # context_patch_latents: (B*S, N_context, D)
-        rng, sigreg_rng_spatial = jax.random.split(rng)
-        sig_reg_spatial = spatial_sigreg_loss(context_patch_latents, sigreg_rng_spatial, num_sketches=num_sigreg_sketches)
-        
-        sig_reg = sig_reg_batch + sig_reg_spatial
+        sig_reg = sigreg_loss(flat_pooled, sigreg_rng_batch, num_sketches=num_sigreg_sketches)
 
         # ── 10. Total Loss (Computed in Float32) ──────────────────────────────
         total_loss = latent_loss + loss_alpha * temporal_loss + probe_loss + sigreg_weight * sig_reg
