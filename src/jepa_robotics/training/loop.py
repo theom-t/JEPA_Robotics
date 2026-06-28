@@ -369,5 +369,12 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             
             print(f"[INFO] Checkpoint saved successfully for Epoch {epoch+1}")
             
+            # Save a historical snapshot every 5 epochs to prevent complete data loss on collapse
+            if (epoch + 1) % 5 == 0:
+                hist_path = os.path.join(save_dir, f"checkpoint_epoch_{epoch+1}.msgpack")
+                with open(hist_path, "wb") as f:
+                    f.write(flax.serialization.to_bytes(state))
+                print(f"[INFO] Historical checkpoint saved: {hist_path}")
+            
     # Return loss for SMAC3 Pareto evaluation
     return float(final_loss)

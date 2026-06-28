@@ -26,15 +26,11 @@ This architecture pushes the absolute boundaries of consumer compute and edge de
 To get the environment running on your RTX 5090:
 
 ```bash
-# 1. Create a Miniforge virtual environment
-conda create -n jepa_robotics python=3.10
+# 1. Create a Miniforge virtual environment using the YAML configuration
+conda env create -f environment.yml
 conda activate jepa_robotics
 
-# 2. Install pip dependencies
-# (Ensure you use the script that fetches the correct JAX/TF nightlies)
-pip install -r requirements.txt
-
-# 3. Download the Datasets
+# 2. Download the Datasets
 # Note: Ensure you have ample NVMe space (BridgeData V2 and LeRobot SO100)
 python scripts/download_datasets.py
 ```

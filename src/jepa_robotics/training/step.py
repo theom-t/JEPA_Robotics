@@ -222,6 +222,12 @@ def create_steps(
         # Cosine distance: 2 - 2 * (a · b). Minimum is 0.0 (perfect alignment).
         latent_loss = jnp.mean(2.0 - 2.0 * jnp.sum(pred_norm * targ_norm, axis=-1))
 
+        # Re-wire SIGReg to fiercely prevent Constant-State Collapse
+        if sigreg_weight > 0.0:
+            context_pooled_f32 = context_pooled.astype(jnp.float32)
+            sr_loss = sigreg_loss(context_pooled_f32, sigreg_rng, num_sigreg_sketches)
+            latent_loss = latent_loss + (sigreg_weight * sr_loss)
+
         # ── 7. World Model Forward Pass ───────────────────────────────────────
         # The World Model reasons over pooled temporal latent sequences.
         # We use CONTEXT pooled latents (what the model actually sees per frame)
