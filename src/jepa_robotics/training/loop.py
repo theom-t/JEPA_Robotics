@@ -269,9 +269,11 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
                 avg_pos_mse = (metrics_b["pos_mse"] + metrics_s["pos_mse"]) / 2.0
                 avg_rot_mse = (metrics_b["rot_mse"] + metrics_s["rot_mse"]) / 2.0
                 avg_grip_mse = (metrics_b["grip_mse"] + metrics_s["grip_mse"]) / 2.0
+                avg_sig_reg = (metrics_b["sig_reg"] + metrics_s["sig_reg"]) / 2.0
                 
                 pbar.set_postfix({
                     "Avg L": f"{avg_loss:.3f}",
+                    "SReg": f"{avg_sig_reg:.3f}",
                     "Pos": f"{avg_pos_mse:.3f}",
                     "Rot": f"{avg_rot_mse:.3f}",
                     "Grp": f"{avg_grip_mse:.3f}"

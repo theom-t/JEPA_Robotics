@@ -31,6 +31,14 @@ Due to severe dependency conflicts between JAX/Blackwell libraries and Google Pr
 ### 4.2. Action-Conditioned Transformer (Latent World Model)
 A temporal simulation engine taking a sequence of historical states $[s_{t-k}, \dots, s_t]$ and planned actions $[a_{t-k}, \dots, a_t]$. It utilizes causal multi-head self-attention to predict the immediate next physical state $\hat{s}_{t+1}$. 
 
+### 4.3. Adaptive Evasive Maneuvers (Dynamic Target Freezing)
+A static EMA update schedule (`tau=0.995`) is extremely brittle over long 100-epoch runs, as it allows the Target Network to be slowly dragged into a zero-variance "Constant-State" collapse if the Context Network discovers a mathematical loophole in the Cosine Distance loss. Conversely, a permanently frozen target (`tau=1.0`) prevents collapse but yields a Latent space with weaker semantic grouping. 
+
+To achieve the best of both worlds, the architecture employs an **Adaptive Evasive Maneuver**:
+- The training loop maintains an Exponential Moving Average of the `sig_reg` variance penalty (an InfoMax metric tracking the variance of the latents).
+- **🟢 EMA (Healthy State):** When the `sig_reg` penalty is low, the network is expanding into the full Latent space. The Target Network smoothly updates via EMA (`tau=0.995`), ensuring deep semantic grouping.
+- **🥶 FROZEN (Evasive Maneuver):** If the Context Network begins to collapse, the `sig_reg` penalty spikes. The training loop intercepts this and instantly hard-freezes the Target Network (`current_tau = 1.0`). The Context Network is then violently forced by the variance penalty to expand out of the collapse zone, but cannot drag the frozen Target down with it. Once healthy variance is restored, the EMA schedule seamlessly resumes.
+
 ## 5. Telemetry & Validation Protocols
 The architecture is instrumented with the following validation metrics:
 

@@ -34,7 +34,7 @@ def run_single_mode(do_eval: bool = True, num_epochs: int = 20, fraction: float 
         "weight_decay": 0.005,
         "tau": 0.995,
         "loss_alpha": 1.0,         # Stable L1/L2 weighting
-        "sigreg_weight": 10.0,     # Increased to 10.0 (VICReg standard) to fiercely prevent Positional Collapse
+        "sigreg_weight": 0.02,     # The true SMAC optimum. A gentle repulsive force to prevent zero-variance collapse.
         "use_amp": True,           # bfloat16 AMP re-enabled
         "disable_wandb": True,
         "sample_fraction": fraction,

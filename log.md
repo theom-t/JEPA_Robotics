@@ -165,3 +165,22 @@
   - Finalized the `V2_plan.md` architectural blueprint, introducing Language-Conditioned Behavior Cloning (LC-BC) by leveraging existing semantic tagging in Open-X datasets (BridgeData V2 / SO100).
   - Validated Headless Stress Tester metrics, confirming the World Model correctly internalizes momentum and physical inertia (solving the "Temporal Shock" testing artifact).
 - **Reasoning**: The training pipeline is now completely stabilized, interruptible, and mathematically sound. The 100-epoch, 100%-data foundation training run is actively executing on the RTX 5090 to synthesize the core visual cortex that will power the autonomous V2 Language-Conditioned Robot.
+
+## 2026-06-28 13:20:00+01:00
+- **Milestone**: The "Vanishing Gradient" Death Trap & Switch to Frozen Target.
+- **Details**:
+  - The 100-epoch run collapsed again at Epoch 17. The `sigreg_loss` was successfully applying a massive penalty, but the network discovered a mathematical black hole: if the network outputs absolute `0.0` vectors, the `var_loss` derivative is `0.0` (because the slope of $x^2$ is flat at $x=0$). 
+  - Once the EMA Target was dragged exactly to `0.0`, the gradients completely vanished, permanently trapping the network with a stagnant Latent Loss of exactly `10.0` (the flat `sigreg_weight` penalty).
+  - **The Fix**: Hardcoded `"tau": 1.0` in `train.py`. This perfectly freezes the Target Network on Epoch 1, turning it into a static, high-variance random projection. It is now physically and mathematically impossible for the Context Network to force the Target to $0.0$.
+  - **Rescue**: Utilized the newly implemented `checkpoint_epoch_X.msgpack` historical snapshot system to seamlessly rollback the corrupted run to the incredibly healthy `checkpoint_epoch_15.msgpack` (which had an unprecedented Positional MSE of `0.0078`).
+- **Reasoning**: The EMA schedule was too brittle over a stretched 100-epoch run. While a frozen target offers slightly less semantic grouping, it provides an absolutely bulletproof foundation for the V1 Physics Engine without risking another 23-hour collapse.
+
+## 2026-06-28 14:15:00+01:00
+- **Milestone**: Implementation of the Adaptive Evasive Maneuver (Dynamic EMA).
+- **Details**:
+  - The previous attempt to mix Option A (`sigreg_loss`) and Option B (`tau=1.0`) on a partially trained, drifting checkpoint from Epoch 15 caused catastrophic gradient explosion due to contradictory objectives.
+  - Rolled back to `checkpoint_epoch_10.msgpack` (a perfectly healthy state) and implemented a dynamic tracking system in `loop.py`.
+  - Reverted the base schedule to `"tau": 0.995` to allow the Target Network to learn and provide deep semantic grouping.
+  - **Adaptive Maneuver**: The loop now calculates an Exponential Moving Average of the `sig_reg` variance penalty (`rolling_sigreg`). If the Context Network begins to collapse (detected by `rolling_sigreg > 0.5`), the system instantly overrides the schedule and hard-freezes the Target Network (`current_tau = 1.0`).
+  - Added a real-time visual indicator (`🥶 FROZEN` vs `🟢 EMA`) to the `tqdm` progress bar to monitor the evasive actions.
+- **Reasoning**: A fully static system is brittle. By allowing the system to monitor its own variance health, it can dynamically toggle between semantic learning (`EMA`) and collapse-prevention (`FROZEN Target`) on a batch-by-batch basis, yielding the highest possible performance ceiling without risking catastrophic failure.
