@@ -29,9 +29,12 @@ class Encoder1DBlock(nn.Module):
 
     @nn.compact
     def __call__(self, inputs: jnp.ndarray) -> jnp.ndarray:
-        # Self-attention block
+        # Self-attention block with explicit cuDNN FlashAttention backend
         x = nn.LayerNorm()(inputs)
-        x = nn.SelfAttention(num_heads=self.num_heads)(x)
+        x = nn.MultiHeadDotProductAttention(
+            num_heads=self.num_heads,
+            dot_product_attention_kwargs={"implementation": "cudnn"}
+        )(x, x)
         x = x + inputs
 
         # MLP block

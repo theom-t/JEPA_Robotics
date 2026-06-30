@@ -45,8 +45,11 @@ class ActionConditionedTransformer(nn.Module):
         for _ in range(self.depth):
             # Attention block
             y = nn.LayerNorm()(x)
-            # Use causal mask in attention
-            y = nn.SelfAttention(num_heads=self.num_heads)(y, mask=mask)
+            # Self-attention over time with explicit cuDNN FlashAttention backend
+            y = nn.MultiHeadDotProductAttention(
+                num_heads=self.num_heads,
+                dot_product_attention_kwargs={"implementation": "cudnn"}
+            )(y, y, mask=mask)
             x = x + y
 
             # MLP block

@@ -1,6 +1,8 @@
 import argparse
-import sys
 import os
+# Enable XLA Latency Hiding Scheduler for maximum overlapping of computation and memory
+os.environ["XLA_FLAGS"] = "--xla_gpu_enable_latency_hiding_scheduler=true"
+import sys
 
 # Suppress XLA C++ warnings and prevent JAX from searching for TPUs
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
