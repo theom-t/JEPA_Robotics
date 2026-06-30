@@ -183,40 +183,30 @@ def create_steps(
         target_pooled = jax.lax.stop_gradient(target_pooled)
         # target_patch_latents: (B*S, N_patches, D)
 
-        # Select only the masked (target) patch latents — these are what we predict
-        target_patch_latents_masked = target_patch_latents[:, target_indices, :]
-        # (B*S, N_target, D)
-
-        # ── 4. Extract Target Positional Embeddings ───────────────────────────
-        # The Predictor needs to know WHERE in the image the masked patches are.
-        # We reuse the encoder's learned positional embedding table (from target_params
-        # so the positions match the E_y feature space). Sliced to target positions.
+        # ── 4. V-JEPA 2.1 Dense Predictive Loss ───────────────────────────────
+        # Instead of only predicting the masked patches, the network is forced to 
+        # densely reconstruct ALL patches (both masked and visible context) from the 
+        # given context latents. This enforces ultra-consistent structural learning.
+        
         pos_embedding = targ_p["params"]["pos_embedding"]  # (1, N_patches, D)
-        target_pos_emb = pos_embedding[:, target_indices, :]       # (1, N_target, D)
-        target_pos_emb = jnp.broadcast_to(
-            target_pos_emb, (b * s, num_target, encoder_def.latent_dim)
-        )  # (B*S, N_target, D)
+        all_pos_emb = jnp.broadcast_to(
+            pos_embedding, (b * s, num_patches, encoder_def.latent_dim)
+        )  # (B*S, N_patches, D)
 
         # ── 5. Predictor (P) ─────────────────────────────────────────────────
-        # P receives visible context latents + positional hints for the masked region,
-        # and predicts what E_y would have produced at those masked positions.
-        predicted_target_latents = predictor_def.apply(
+        predicted_all_latents = predictor_def.apply(
             pred_p,
             context_patch_latents,
-            target_pos_emb,
-        )  # (B*S, N_target, D)
+            all_pos_emb,
+        )  # (B*S, N_patches, D)
         
         # CAST BACK TO FLOAT32 BEFORE LOSS COMPUTATION
-        # Computing loss gradients in bfloat16 causes catastrophic quantization and collapse!
-        predicted_target_latents = predicted_target_latents.astype(jnp.float32)
-        target_patch_latents_masked = target_patch_latents_masked.astype(jnp.float32)
+        predicted_all_latents = predicted_all_latents.astype(jnp.float32)
+        target_patch_latents = target_patch_latents.astype(jnp.float32)
         
-        # CRITICAL: L2 Hypersphere Normalization + Cosine Distance.
-        # We CANNOT use MSE(pred_norm, targ_norm) because if the network outputs 0.0, 
-        # MSE(0,0) = 0.0, which tricks the optimizer into thinking the collapse is a perfect solution.
-        # Cosine distance yields 2.0 (maximum error) for zero vectors, fiercely punishing collapse!
-        pred_norm = predicted_target_latents / jnp.maximum(jnp.linalg.norm(predicted_target_latents, axis=-1, keepdims=True), 1e-12)
-        targ_norm = target_patch_latents_masked / jnp.maximum(jnp.linalg.norm(target_patch_latents_masked, axis=-1, keepdims=True), 1e-12)
+        # L2 Hypersphere Normalization
+        pred_norm = predicted_all_latents / jnp.maximum(jnp.linalg.norm(predicted_all_latents, axis=-1, keepdims=True), 1e-12)
+        targ_norm = target_patch_latents / jnp.maximum(jnp.linalg.norm(target_patch_latents, axis=-1, keepdims=True), 1e-12)
 
         # ── 6. JEPA Latent Loss ───────────────────────────────────────────────
         # Cosine distance: 2 - 2 * (a · b). Minimum is 0.0 (perfect alignment).

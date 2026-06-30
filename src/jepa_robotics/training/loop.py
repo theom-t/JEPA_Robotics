@@ -86,7 +86,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
     sigreg_weight = config.get("sigreg_weight", 0.1)
 
     # Masking geometry — computed here so loop and step are in sync
-    image_size = 256
+    image_size = config.get("image_size", 256)
     num_patches = (image_size // patch_size) ** 2
     num_target = int(num_patches * masking_ratio)
     num_context = num_patches - num_target

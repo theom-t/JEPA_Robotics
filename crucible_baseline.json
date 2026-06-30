@@ -1,0 +1,12 @@
+{
+    "perception": {
+        "baseline_mse": 0.17771039350829038,
+        "occluded_mse": 0.17553729729751505,
+        "degradation_factor": 0.9877716432584998
+    },
+    "imagination": {
+        "teleportation_violations": 12,
+        "collision_violations": 44,
+        "average_jerk": 0.10811630467196895
+    }
+}

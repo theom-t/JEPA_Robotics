@@ -110,7 +110,7 @@ class BridgeDataLoader(BaseRobotDataset):
             
             def decode_img(img_str):
                 img = tf.io.decode_image(img_str, channels=3, expand_animations=False)
-                img = tf.image.resize(img, [256, 256])
+                img = tf.image.resize(img, [512, 512])
                 return tf.cast(img, tf.uint8)
                 
             images = tf.map_fn(decode_img, parsed['steps/observation/image'], fn_output_signature=tf.uint8)
@@ -145,7 +145,7 @@ class BridgeDataLoader(BaseRobotDataset):
             
         for imgs, states, actions in batched_ds.as_numpy_iterator():
             batch = {
-                "image": imgs,                     # (B, S, 256, 256, 3) already contiguous!
+                "image": imgs,                     # (B, S, 512, 512, 3) already contiguous!
                 "joint_states": states,            # (B, S, 7) for WidowX
                 "joint_actions": actions           # (B, S, 7) for WidowX
             }
@@ -221,7 +221,7 @@ class SO100DataLoader(BaseRobotDataset):
                     if not ret:
                         break
                     
-                    frame = cv2.resize(frame, (256, 256))
+                    frame = cv2.resize(frame, (512, 512))
                     
                     # CRITICAL PERFORMANCE FIX: cv2.cvtColor is incredibly slow because it allocates
                     # a new memory array for every frame. By using a numpy slice, we perform a zero-copy
@@ -255,7 +255,7 @@ class SO100DataLoader(BaseRobotDataset):
             dof = all_states.shape[-1]
             
             # Pre-allocate zero-copy numpy arrays to prevent Python memory copies and GIL locks
-            batch_imgs = np.empty((self.batch_size, self.seq_len, 256, 256, 3), dtype=np.uint8)
+            batch_imgs = np.empty((self.batch_size, self.seq_len, 512, 512, 3), dtype=np.uint8)
             batch_states = np.empty((self.batch_size, self.seq_len, dof), dtype=np.float32)
             batch_actions = np.empty((self.batch_size, self.seq_len, dof), dtype=np.float32)
             
@@ -304,7 +304,7 @@ class SO100DataLoader(BaseRobotDataset):
                     
                     # Allocate fresh array for the next batch (very fast single memcpy in C)
                     batch_idx = 0
-                    batch_imgs = np.empty((self.batch_size, self.seq_len, 256, 256, 3), dtype=np.uint8)
+                    batch_imgs = np.empty((self.batch_size, self.seq_len, 512, 512, 3), dtype=np.uint8)
                     batch_states = np.empty((self.batch_size, self.seq_len, dof), dtype=np.float32)
                     batch_actions = np.empty((self.batch_size, self.seq_len, dof), dtype=np.float32)
                     
