@@ -19,11 +19,12 @@ from jepa_robotics.models.v_jepa import ViTEncoder, StateLinearProbe
 from jepa_robotics.models.world_model import ActionConditionedTransformer
 from jepa_robotics.data.kinematics import forward_kinematics
 
-# V1 Config Baseline
+# V1.5 Config Baseline
 CONFIG = {
     "latent_dim": 256,
     "vit_depth": 4,
     "patch_size": 16,
+    "image_size": 512, # Upgraded to 512x512 for V1.5
     "wm_depth": 4,
     "num_heads": 16,
     "activation_fn": "gelu"
@@ -37,6 +38,7 @@ def load_models(weights_path):
         depth=CONFIG["vit_depth"], 
         num_heads=CONFIG["num_heads"],
         patch_size=CONFIG["patch_size"], 
+        image_size=CONFIG["image_size"],
         activation_fn=CONFIG["activation_fn"]
     )
     probe_def = StateLinearProbe(out_dim=10)
@@ -204,16 +206,16 @@ def run_crucible_imagination_test(env, encoder_def, wm_def, probe_def, loaded_st
     }
 
 if __name__ == "__main__":
-    weights_path = "/home/tmainetucker/Repos/JEPA_Robotics/models/v1_jepa_backbone/v1_final_weights.msgpack"
+    weights_path = "/home/tmainetucker/Repos/JEPA_Robotics/checkpoints/v1_5_jepa_backbone/checkpoint.msgpack"
     if not os.path.exists(weights_path):
-        # fallback
-        weights_path = "/home/tmainetucker/Repos/JEPA_Robotics/checkpoints/v1_jepa_backbone/checkpoint_epoch_100.msgpack"
+        # fallback to initial weights if it hasn't checkpointed yet
+        weights_path = "/home/tmainetucker/Repos/JEPA_Robotics/models/v1_jepa_backbone/v1_5_initial_weights.msgpack"
     
     if not os.path.exists(weights_path):
-        print(f"Weights not found. Please ensure V1 is trained.")
+        print(f"Weights not found. Please ensure V1.5 is trained.")
         sys.exit(1)
         
-    env = SO100SimEnv()
+    env = SO100SimEnv(image_size=CONFIG["image_size"])
     encoder_def, probe_def, wm_def, loaded_state = load_models(weights_path)
     
     metrics = {}

@@ -26,7 +26,7 @@ def run_v1_5_burst(do_eval: bool = True, num_epochs: int = 20):
         "masking_ratio": 0.75,     
         "wm_depth": 4,             
         "num_heads": 16,           
-        "batch_size": 64,          # Reduced from 128 to 64 to prevent OOM with 1024 patches
+        "batch_size": 16,          # Reduced dramatically to 16 to prevent OOM with 512x512 + Deep Supervision
         "seq_len": 6,              
         "activation_fn": "gelu",   
         "learning_rate": 0.0003,

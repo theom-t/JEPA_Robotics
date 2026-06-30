@@ -6,13 +6,13 @@ import cv2
 from jepa_robotics.data.kinematics import forward_kinematics
 
 class SO100SimEnv:
-    def __init__(self, xml_path="/home/tmainetucker/Repos/JEPA_Robotics/data/mujoco_assets/so101/scene.xml"):
+    def __init__(self, xml_path="/home/tmainetucker/Repos/JEPA_Robotics/data/mujoco_assets/so101/scene.xml", image_size=256):
         if not os.path.exists(xml_path):
             raise FileNotFoundError(f"Could not find {xml_path}")
             
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
-        self.renderer = mujoco.Renderer(self.model, height=256, width=256)
+        self.renderer = mujoco.Renderer(self.model, height=image_size, width=image_size)
         
         # -------------------------------------------------------------
         # Lock Camera to 1B Perspective (The Training Baseline)
