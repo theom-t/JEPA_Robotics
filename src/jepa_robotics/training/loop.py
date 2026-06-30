@@ -93,7 +93,7 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
 
     encoder_def = ViTEncoder(
         latent_dim=latent_dim, depth=vit_depth, num_heads=num_heads,
-        patch_size=patch_size, activation_fn=activation_fn,
+        patch_size=patch_size, image_size=image_size, activation_fn=activation_fn,
     )
     predictor_def = JEPAPredictor(
         latent_dim=latent_dim, activation_fn=activation_fn
@@ -188,10 +188,27 @@ def train_model(config: Dict[str, Any], num_epochs: int = 1, do_eval: bool = Tru
             import flax.serialization
             with open(ckpt_path, "rb") as f:
                 ckpt_bytes = f.read()
-            # Deserialize into the initialized state tree to preserve correct JAX types
-            state = flax.serialization.from_bytes(state, ckpt_bytes)
-            start_epoch = state.get("epoch", 0)
-            print(f"[INFO] Resumed successfully. Starting at Epoch {start_epoch+1}")
+            try:
+                # Deserialize into the initialized state tree to preserve correct JAX types
+                state = flax.serialization.from_bytes(state, ckpt_bytes)
+                start_epoch = state.get("epoch", 0)
+                print(f"[INFO] Resumed successfully. Starting at Epoch {start_epoch+1}")
+            except ValueError:
+                print(f"[WARNING] Strict checkpoint loading failed (likely due to V1.5 Deep Supervision heads).")
+                print(f"[INFO] Attempting safe component-wise weight loading...")
+                import flax
+                raw_ckpt_dict = flax.serialization.msgpack_restore(ckpt_bytes)
+                
+                # The safest way to load weights when architecture changes:
+                # We use flax.serialization.from_state_dict on individual components that match!
+                state["encoder_params"] = flax.serialization.from_state_dict(state["encoder_params"], raw_ckpt_dict["encoder_params"])
+                state["wm_params"] = flax.serialization.from_state_dict(state["wm_params"], raw_ckpt_dict["wm_params"])
+                state["probe_params"] = flax.serialization.from_state_dict(state["probe_params"], raw_ckpt_dict["probe_params"])
+                state["target_params"] = flax.serialization.from_state_dict(state["target_params"], raw_ckpt_dict["target_params"])
+                
+                print(f"[INFO] Successfully loaded Encoder, World Model, and Probe weights.")
+                start_epoch = 0
+                print(f"[INFO] New architecture heads and optimizers initialized from scratch. Starting at Epoch {start_epoch+1}")
     
     use_amp = config.get("use_amp", False)
     

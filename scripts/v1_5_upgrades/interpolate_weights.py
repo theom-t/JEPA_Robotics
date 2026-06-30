@@ -41,11 +41,11 @@ def main():
         print(f"  -> New shape: {new_emb.shape}")
         
     # Interpolate Target Encoder
-    if 'target_encoder_params' in state_dict and 'pos_embedding' in state_dict['target_encoder_params']['params']:
-        old_emb = state_dict['target_encoder_params']['params']['pos_embedding']
+    if 'target_params' in state_dict and 'pos_embedding' in state_dict['target_params']['params']:
+        old_emb = state_dict['target_params']['params']['pos_embedding']
         print(f"Interpolating Target Encoder pos_embedding from {old_emb.shape}...")
         new_emb = interpolate_pos_embedding(old_emb)
-        state_dict['target_encoder_params']['params']['pos_embedding'] = new_emb
+        state_dict['target_params']['params']['pos_embedding'] = new_emb
         print(f"  -> New shape: {new_emb.shape}")
         
     with open(output_path, "wb") as f:

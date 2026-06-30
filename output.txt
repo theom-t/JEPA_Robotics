@@ -1,142 +1,31 @@
-(jepa_robotics) tmainetucker@tmainetucker-MS-7E61:~/Repos/JEPA_Robotics$ python scripts/train.py --mode single --epochs 100 --fraction 1
+(jepa_robotics) tmainetucker@tmainetucker-MS-7E61:~/Repos/JEPA_Robotics$ python scripts/trainV1_5.py
+Running V1.5 High-Acuity Burst for 20 epochs. 512x512 Resolution mode.
+[INFO] Resuming training from checkpoints/v1_5_jepa_backbone/checkpoint.msgpack...
+[WARNING] Strict checkpoint loading failed (likely due to V1.5 Deep Supervision heads).
+[INFO] Attempting soft-merge of weights...
+[INFO] Soft-merge completed. New architecture heads initialized from scratch. Starting at Epoch 1
 
-Running in SINGLE mode for 100 epochs with 100% data. Using final V-JEPA backbone config.
-[INFO] Resuming training from checkpoints/v1_jepa_backbone/checkpoint.msgpack...
-[INFO] Resumed successfully. Starting at Epoch 70
-
-Starting Training Run (Latent: 256, Epochs: 100, Patch: 16, MaskRatio: 0.75, SIGReg: 0.020)...
+Starting Training Run (Latent: 256, Epochs: 20, Patch: 16, MaskRatio: 0.75, SIGReg: 0.020)...
 Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: train, Fraction: 1.0)
-Epoch 70/100: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
-Epoch 70/100: 6752batch [22:34,  4.98batch/s, Avg L=0.812, SReg=0.708, Pos=0.021, Rot=0.314, Grp=0.139]
+Epoch 1/20: 0batch [00:00, ?batch/s]Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: train, Fraction: 1.0)
+Epoch 1/20: 0batch [00:06, ?batch/s]
+jax.errors.SimplifiedTraceback: For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
 
-✅ Epoch 70 Train Completed - Avg Loss: 1.0821
+The above exception was the direct cause of the following exception:
 
-Loading REAL BridgeData V2 (Raw TFRecord) from /home/tmainetucker/Repos/JEPA_Robotics/data/bridge_data_v2... (Split: val, Fraction: 1.0)
-Loading REAL LeRobot SO100 Data OFFLINE from /home/tmainetucker/Repos/JEPA_Robotics/data/lerobot_so100... (Split: val, Fraction: 1.0)
-Epoch 70 Validation: 926batch [03:20,  4.63batch/s, Val L=1.463, Pos=0.018, Rot=0.290, Grp=0.145]
-\n🎯 Epoch 70 Validation Completed - Val Avg Loss: 1.2183 | Pos: 0.0257 | Rot: 0.2423 | Grp: 0.0934 | SMAC Score: 1.0893\n
-[INFO] Checkpoint saved successfully for Epoch 70
-[INFO] Historical checkpoint saved: checkpoints/v1_jepa_backbone/checkpoint_epoch_70.msgpack
-Epoch 71/100: 6752batch [20:54,  5.38batch/s, Avg L=0.833, SReg=0.902, Pos=0.029, Rot=0.291, Grp=0.113]
-
-✅ Epoch 71 Train Completed - Avg Loss: 0.9596
-
-Epoch 71 Validation: 926batch [03:00,  5.12batch/s, Val L=1.431, Pos=0.018, Rot=0.272, Grp=0.129]
-\n🎯 Epoch 71 Validation Completed - Val Avg Loss: 1.2796 | Pos: 0.0230 | Rot: 0.2431 | Grp: 0.0856 | SMAC Score: 1.0207\n
-[INFO] Checkpoint saved successfully for Epoch 71
-Epoch 72/100: 6752batch [20:58,  5.37batch/s, Avg L=0.823, SReg=0.775, Pos=0.037, Rot=0.329, Grp=0.259]
-
-✅ Epoch 72 Train Completed - Avg Loss: 0.9161
-
-Epoch 72 Validation: 926batch [03:02,  5.09batch/s, Val L=1.442, Pos=0.016, Rot=0.281, Grp=0.152]
-\n🎯 Epoch 72 Validation Completed - Val Avg Loss: 1.2806 | Pos: 0.0239 | Rot: 0.2533 | Grp: 0.0979 | SMAC Score: 1.0783\n
-[INFO] Checkpoint saved successfully for Epoch 72
-Epoch 73/100: 6752batch [20:58,  5.37batch/s, Avg L=0.789, SReg=0.830, Pos=0.018, Rot=0.260, Grp=0.102]
-
-✅ Epoch 73 Train Completed - Avg Loss: 0.8964
-
-Epoch 73 Validation: 926batch [03:04,  5.02batch/s, Val L=1.571, Pos=0.017, Rot=0.283, Grp=0.092]
-\n🎯 Epoch 73 Validation Completed - Val Avg Loss: 1.4326 | Pos: 0.0167 | Rot: 0.2453 | Grp: 0.0831 | SMAC Score: 0.8921\n
-[INFO] Checkpoint saved successfully for Epoch 73
-Epoch 74/100: 6752batch [21:10,  5.31batch/s, Avg L=0.639, SReg=0.507, Pos=0.063, Rot=0.304, Grp=0.132]
-
-✅ Epoch 74 Train Completed - Avg Loss: 0.8833
-
-Epoch 74 Validation: 926batch [03:05,  4.98batch/s, Val L=0.990, Pos=0.025, Rot=0.254, Grp=0.095]
-\n🎯 Epoch 74 Validation Completed - Val Avg Loss: 0.8536 | Pos: 0.0314 | Rot: 0.2432 | Grp: 0.0802 | SMAC Score: 1.1777\n
-[INFO] Checkpoint saved successfully for Epoch 74
-Epoch 75/100: 6752batch [20:56,  5.38batch/s, Avg L=1.023, SReg=0.946, Pos=0.025, Rot=0.288, Grp=0.105]
-
-✅ Epoch 75 Train Completed - Avg Loss: 0.8646
-
-Epoch 75 Validation: 926batch [03:02,  5.08batch/s, Val L=1.387, Pos=0.029, Rot=0.274, Grp=0.127]
-\n🎯 Epoch 75 Validation Completed - Val Avg Loss: 1.2695 | Pos: 0.0158 | Rot: 0.2398 | Grp: 0.0759 | SMAC Score: 0.8509\n
-[INFO] Checkpoint saved successfully for Epoch 75
-[INFO] Historical checkpoint saved: checkpoints/v1_jepa_backbone/checkpoint_epoch_75.msgpack
-Epoch 76/100: 6752batch [21:38,  5.20batch/s, Avg L=0.784, SReg=0.682, Pos=0.032, Rot=0.266, Grp=0.099]
-
-✅ Epoch 76 Train Completed - Avg Loss: 0.8551
-
-Epoch 76 Validation: 926batch [03:02,  5.08batch/s, Val L=1.019, Pos=0.017, Rot=0.242, Grp=0.116]
-\n🎯 Epoch 76 Validation Completed - Val Avg Loss: 0.8538 | Pos: 0.0218 | Rot: 0.2404 | Grp: 0.0963 | SMAC Score: 1.0142\n
-[INFO] Checkpoint saved successfully for Epoch 76
-Epoch 77/100: 6752batch [21:00,  5.36batch/s, Avg L=0.772, SReg=0.644, Pos=0.011, Rot=0.274, Grp=0.089]
-
-✅ Epoch 77 Train Completed - Avg Loss: 0.8455
-
-Epoch 77 Validation: 926batch [03:02,  5.08batch/s, Val L=1.347, Pos=0.011, Rot=0.269, Grp=0.117]
-\n🎯 Epoch 77 Validation Completed - Val Avg Loss: 1.2008 | Pos: 0.0125 | Rot: 0.2465 | Grp: 0.0828 | SMAC Score: 0.8099\n
-[INFO] Checkpoint saved successfully for Epoch 77
-Epoch 78/100: 6752batch [21:28,  5.24batch/s, Avg L=0.740, SReg=0.724, Pos=0.039, Rot=0.238, Grp=0.118]
-
-✅ Epoch 78 Train Completed - Avg Loss: 0.8325
-
-Epoch 78 Validation: 926batch [03:06,  4.98batch/s, Val L=0.979, Pos=0.030, Rot=0.272, Grp=0.080]
-\n🎯 Epoch 78 Validation Completed - Val Avg Loss: 0.8429 | Pos: 0.0282 | Rot: 0.2386 | Grp: 0.0699 | SMAC Score: 1.0850\n
-[INFO] Checkpoint saved successfully for Epoch 78
-Epoch 79/100: 6752batch [20:57,  5.37batch/s, Avg L=0.681, SReg=0.670, Pos=0.021, Rot=0.261, Grp=0.091]
-
-✅ Epoch 79 Train Completed - Avg Loss: 0.8202
-
-Epoch 79 Validation: 926batch [03:02,  5.08batch/s, Val L=0.970, Pos=0.023, Rot=0.241, Grp=0.104]
-\n🎯 Epoch 79 Validation Completed - Val Avg Loss: 0.8560 | Pos: 0.0171 | Rot: 0.2346 | Grp: 0.0830 | SMAC Score: 0.8832\n
-[INFO] Checkpoint saved successfully for Epoch 79
-Epoch 80/100: 6752batch [22:26,  5.01batch/s, Avg L=0.790, SReg=0.612, Pos=0.093, Rot=0.252, Grp=0.094]
-
-✅ Epoch 80 Train Completed - Avg Loss: 0.8108
-
-Epoch 80 Validation: 926batch [03:12,  4.80batch/s, Val L=1.310, Pos=0.021, Rot=0.315, Grp=0.117]
-\n🎯 Epoch 80 Validation Completed - Val Avg Loss: 1.1821 | Pos: 0.0203 | Rot: 0.2402 | Grp: 0.0959 | SMAC Score: 0.9820\n
-[INFO] Checkpoint saved successfully for Epoch 80
-[INFO] Historical checkpoint saved: checkpoints/v1_jepa_backbone/checkpoint_epoch_80.msgpack
-Epoch 81/100: 6752batch [22:29,  5.00batch/s, Avg L=0.583, SReg=0.546, Pos=0.015, Rot=0.275, Grp=0.082]
-
-✅ Epoch 81 Train Completed - Avg Loss: 0.8002
-
-Epoch 81 Validation: 926batch [03:30,  4.41batch/s, Val L=1.405, Pos=0.017, Rot=0.270, Grp=0.116]
-\n🎯 Epoch 81 Validation Completed - Val Avg Loss: 1.2777 | Pos: 0.0166 | Rot: 0.2423 | Grp: 0.0787 | SMAC Score: 0.8763\n
-[INFO] Checkpoint saved successfully for Epoch 81
-Epoch 82/100: 6752batch [21:41,  5.19batch/s, Avg L=0.577, SReg=0.476, Pos=0.015, Rot=0.265, Grp=0.094]
-
-✅ Epoch 82 Train Completed - Avg Loss: 0.7929
-
-Epoch 82 Validation: 926batch [03:05,  4.99batch/s, Val L=0.956, Pos=0.013, Rot=0.240, Grp=0.086]
-\n🎯 Epoch 82 Validation Completed - Val Avg Loss: 0.8661 | Pos: 0.0157 | Rot: 0.2338 | Grp: 0.0736 | SMAC Score: 0.8352\n
-[INFO] Checkpoint saved successfully for Epoch 82
-Epoch 83/100: 6752batch [21:26,  5.25batch/s, Avg L=0.625, SReg=0.632, Pos=0.014, Rot=0.252, Grp=0.087]
-
-✅ Epoch 83 Train Completed - Avg Loss: 0.7908
-
-Epoch 83 Validation: 926batch [03:03,  5.06batch/s, Val L=0.974, Pos=0.017, Rot=0.261, Grp=0.104]
-\n🎯 Epoch 83 Validation Completed - Val Avg Loss: 0.8702 | Pos: 0.0146 | Rot: 0.2364 | Grp: 0.0800 | SMAC Score: 0.8312\n
-[INFO] Checkpoint saved successfully for Epoch 83
-Epoch 84/100: 6752batch [21:00,  5.36batch/s, Avg L=0.875, SReg=0.754, Pos=0.010, Rot=0.270, Grp=0.081]
-
-✅ Epoch 84 Train Completed - Avg Loss: 0.7909
-
-Epoch 84 Validation: 926batch [03:04,  5.02batch/s, Val L=0.966, Pos=0.011, Rot=0.249, Grp=0.090]
-\n🎯 Epoch 84 Validation Completed - Val Avg Loss: 0.9048 | Pos: 0.0131 | Rot: 0.2357 | Grp: 0.0705 | SMAC Score: 0.7800\n
-[INFO] Checkpoint saved successfully for Epoch 84
-Epoch 85/100: 6752batch [21:54,  5.14batch/s, Avg L=0.827, SReg=0.544, Pos=0.015, Rot=0.274, Grp=0.076]
-
-✅ Epoch 85 Train Completed - Avg Loss: 0.7839
-
-Epoch 85 Validation: 926batch [03:05,  5.00batch/s, Val L=0.988, Pos=0.014, Rot=0.249, Grp=0.098]
-\n🎯 Epoch 85 Validation Completed - Val Avg Loss: 0.8913 | Pos: 0.0142 | Rot: 0.2332 | Grp: 0.0749 | SMAC Score: 0.8077\n
-[INFO] Checkpoint saved successfully for Epoch 85
-[INFO] Historical checkpoint saved: checkpoints/v1_jepa_backbone/checkpoint_epoch_85.msgpack
-Epoch 86/100: 6752batch [22:16,  5.05batch/s, Avg L=0.562, SReg=0.509, Pos=0.014, Rot=0.278, Grp=0.097]
-
-✅ Epoch 86 Train Completed - Avg Loss: 0.7804
-
-Epoch 86 Validation: 926batch [03:11,  4.84batch/s, Val L=1.424, Pos=0.018, Rot=0.251, Grp=0.092]
-\n🎯 Epoch 86 Validation Completed - Val Avg Loss: 1.2223 | Pos: 0.0198 | Rot: 0.2384 | Grp: 0.0746 | SMAC Score: 0.9262\n
-[INFO] Checkpoint saved successfully for Epoch 86
-Epoch 87/100: 6752batch [22:14,  5.06batch/s, Avg L=0.577, SReg=0.529, Pos=0.014, Rot=0.265, Grp=0.113]
-
-✅ Epoch 87 Train Completed - Avg Loss: 0.7755
-
-Epoch 87 Validation: 926batch [03:16,  4.71batch/s, Val L=1.330, Pos=0.022, Rot=0.267, Grp=0.103]
-\n🎯 Epoch 87 Validation Completed - Val Avg Loss: 1.2217 | Pos: 0.0169 | Rot: 0.2373 | Grp: 0.0736 | SMAC Score: 0.8658\n
-[INFO] Checkpoint saved successfully for Epoch 87
-Epoch 88/100: 3156batch [10:23,  5.77batch/s, Avg L=0.616, SReg=0.504, Pos=0.011, Rot=0.200, Grp=0.040]
+Traceback (most recent call last):
+  File "/home/tmainetucker/Repos/JEPA_Robotics/scripts/trainV1_5.py", line 62, in <module>
+    run_v1_5_burst(do_eval=args.eval, num_epochs=args.epochs)
+  File "/home/tmainetucker/Repos/JEPA_Robotics/scripts/trainV1_5.py", line 43, in run_v1_5_burst
+    final_loss = train_model(config, num_epochs=num_epochs, do_eval=do_eval, save_dir="checkpoints/v1_5_jepa_backbone")
+  File "/home/tmainetucker/Repos/JEPA_Robotics/src/jepa_robotics/training/loop.py", line 283, in train_model
+    state, metrics_b = train_step_fn(state, bridge_batch, current_tau)
+  File "/home/tmainetucker/Repos/JEPA_Robotics/src/jepa_robotics/training/step.py", line 324, in train_step
+    core_updates, new_core_opt_state = core_optimizer.update(
+  File "/home/tmainetucker/miniforge3/envs/jepa_robotics/lib/python3.10/site-packages/optax/transforms/_combining.py", line 89, in update_fn
+    updates, new_s = fn(updates, s, params, **extra_args)
+  File "/home/tmainetucker/miniforge3/envs/jepa_robotics/lib/python3.10/site-packages/optax/transforms/_combining.py", line 82, in update_fn
+    raise ValueError(
+ValueError: The number of updates and states has to be the same in chain! Make sure you have called init first!
+terminate called without an active exception
+Aborted (core dumped)

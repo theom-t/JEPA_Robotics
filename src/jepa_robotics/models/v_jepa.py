@@ -65,6 +65,7 @@ class ViTEncoder(nn.Module):
     num_heads: int = 8
     mlp_dim: int = 1024
     patch_size: int = 16
+    image_size: int = 256
     activation_fn: str = "gelu"
 
     @nn.compact
@@ -95,10 +96,10 @@ class ViTEncoder(nn.Module):
         )(x)
         x = x.reshape((b, -1, self.latent_dim))  # (B, N_patches, D)
 
-        num_patches = x.shape[1]
-
         # 2. Add positional embeddings to ALL patches BEFORE masking.
         #    This preserves correct spatial position info in every kept patch token.
+        num_patches = (self.image_size // self.patch_size) ** 2
+        
         pos_embedding = self.param(
             "pos_embedding",
             nn.initializers.normal(stddev=0.02),
@@ -112,19 +113,21 @@ class ViTEncoder(nn.Module):
             x = x[:, patch_indices, :]  # (B, N_keep, D)
 
         # 4. Transformer blocks over the (possibly masked) patch sequence
+        intermediates = []
         for _ in range(self.depth):
             x = Encoder1DBlock(
                 mlp_dim=self.mlp_dim,
                 num_heads=self.num_heads,
                 activation_fn=self.activation_fn,
             )(x)
+            intermediates.append(x)
 
         x = nn.LayerNorm()(x)
 
         # 5. Pool across the patch sequence for World Model / Probe consumption
         pooled = jnp.mean(x, axis=1)  # (B, D)
 
-        return x, pooled
+        return intermediates, pooled
 
 
 class JEPAPredictor(nn.Module):
@@ -152,13 +155,14 @@ class JEPAPredictor(nn.Module):
     num_heads: int = 4
     mlp_dim: int = 512
     activation_fn: str = "gelu"
+    target_depth: int = 4 # Match ViTEncoder depth for Deep Supervision
 
     @nn.compact
     def __call__(
         self,
         context_latents: jnp.ndarray,
         target_pos_embeddings: jnp.ndarray,
-    ) -> jnp.ndarray:
+    ) -> list:
         """
         Args:
             context_latents: ``(B, N_context, D)`` encoded context patch latents from E_x.
@@ -199,9 +203,15 @@ class JEPAPredictor(nn.Module):
             )(x)
 
         x = nn.LayerNorm()(x)
+        out = x[:, n_context:, :]
 
-        # Return ONLY the target position outputs — these are the predictions
-        return x[:, n_context:, :]  # (B, N_target, D)
+        # V1.5 Deep Self-Supervision: Sprout K heads to predict K intermediate target layers
+        predictions = []
+        for i in range(self.target_depth):
+            head_out = nn.Dense(self.latent_dim, name=f"deep_head_{i}")(out)
+            predictions.append(head_out)
+
+        return predictions  # List of K predictions, each (B, N_target, D)
 
 
 class StateLinearProbe(nn.Module):

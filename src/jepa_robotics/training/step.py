@@ -163,25 +163,23 @@ def create_steps(
         # ── 2. Context Encoder (E_x) ─────────────────────────────────────────
         # E_x is BLIND to the masked region — it only processes context patches.
         # This forces the Predictor to genuinely infer missing spatial content.
-        context_patch_latents, context_pooled = encoder_def.apply(
+        context_patch_latents_list, context_pooled = encoder_def.apply(
             enc_p,
             flat_images,
             patch_indices=context_indices,
         )
-        # context_patch_latents: (B*S, N_context, D)
-        # context_pooled:        (B*S, D)
+        # The Predictor only processes the FINAL block's output from the context encoder
+        context_patch_latents = context_patch_latents_list[-1]
 
         # ── 3. Target Encoder (E_y) ───────────────────────────────────────────
         # E_y sees ALL patches — it is the EMA teacher, providing clean targets.
         # stop_gradient: E_y is never updated by backprop, only via EMA.
-        target_patch_latents, target_pooled = encoder_def.apply(
+        target_patch_latents_list, target_pooled = encoder_def.apply(
             targ_p,
             flat_images,
             patch_indices=None,  # All patches — no masking on the target path
         )
-        target_patch_latents = jax.lax.stop_gradient(target_patch_latents)
         target_pooled = jax.lax.stop_gradient(target_pooled)
-        # target_patch_latents: (B*S, N_patches, D)
 
         # ── 4. V-JEPA 2.1 Dense Predictive Loss ───────────────────────────────
         # Instead of only predicting the masked patches, the network is forced to 
@@ -194,23 +192,30 @@ def create_steps(
         )  # (B*S, N_patches, D)
 
         # ── 5. Predictor (P) ─────────────────────────────────────────────────
-        predicted_all_latents = predictor_def.apply(
+        predicted_all_latents_list = predictor_def.apply(
             pred_p,
             context_patch_latents,
             all_pos_emb,
-        )  # (B*S, N_patches, D)
+        )  # List of K tensors, each (B*S, N_patches, D)
         
-        # CAST BACK TO FLOAT32 BEFORE LOSS COMPUTATION
-        predicted_all_latents = predicted_all_latents.astype(jnp.float32)
-        target_patch_latents = target_patch_latents.astype(jnp.float32)
+        # ── 6. V1.5 Deep Self-Supervision JEPA Loss ───────────────────────────
+        # We compute the cosine distance at EVERY depth block of the Target Encoder!
+        latent_loss = 0.0
+        num_layers = len(target_patch_latents_list)
         
-        # L2 Hypersphere Normalization
-        pred_norm = predicted_all_latents / jnp.maximum(jnp.linalg.norm(predicted_all_latents, axis=-1, keepdims=True), 1e-12)
-        targ_norm = target_patch_latents / jnp.maximum(jnp.linalg.norm(target_patch_latents, axis=-1, keepdims=True), 1e-12)
-
-        # ── 6. JEPA Latent Loss ───────────────────────────────────────────────
-        # Cosine distance: 2 - 2 * (a · b). Minimum is 0.0 (perfect alignment).
-        latent_loss = jnp.mean(2.0 - 2.0 * jnp.sum(pred_norm * targ_norm, axis=-1))
+        for i in range(num_layers):
+            pred = predicted_all_latents_list[i].astype(jnp.float32)
+            targ = jax.lax.stop_gradient(target_patch_latents_list[i]).astype(jnp.float32)
+            
+            # L2 Hypersphere Normalization
+            pred_norm = pred / jnp.maximum(jnp.linalg.norm(pred, axis=-1, keepdims=True), 1e-12)
+            targ_norm = targ / jnp.maximum(jnp.linalg.norm(targ, axis=-1, keepdims=True), 1e-12)
+            
+            # Cosine distance: 2 - 2 * (a · b). Minimum is 0.0 (perfect alignment).
+            layer_loss = jnp.mean(2.0 - 2.0 * jnp.sum(pred_norm * targ_norm, axis=-1))
+            latent_loss += layer_loss
+            
+        latent_loss = latent_loss / num_layers # Average loss across all depths
 
         # Re-wire SIGReg to fiercely prevent Constant-State Collapse
         if sigreg_weight > 0.0:
