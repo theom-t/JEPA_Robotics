@@ -12,6 +12,7 @@ ENV/
 
 # ML Models
 checkpoints/
+*.msgpack
 
 # Datasets
 datasets/
