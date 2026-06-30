@@ -2,6 +2,8 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from typing import Optional, Tuple
+import functools
+from jax.nn import dot_product_attention
 
 
 class MLPBlock(nn.Module):
@@ -32,8 +34,10 @@ class Encoder1DBlock(nn.Module):
         # Self-attention block with explicit cuDNN FlashAttention backend
         x = nn.LayerNorm()(inputs)
         x = nn.MultiHeadDotProductAttention(
+            name="SelfAttention_0",
             num_heads=self.num_heads,
-            dot_product_attention_kwargs={"implementation": "cudnn"}
+            dtype=jnp.bfloat16,
+            attention_fn=functools.partial(dot_product_attention, implementation="cudnn")
         )(x, x)
         x = x + inputs
 

@@ -38,18 +38,18 @@ class ActionConditionedTransformer(nn.Module):
         
         # Create a causal mask to prevent attending to future states
         # Shape: (1, 1, seq_len, seq_len) for Flax SelfAttention
-        mask = jnp.tril(jnp.ones((seq_len, seq_len)))
+        mask = jnp.tril(jnp.ones((seq_len, seq_len), dtype=jnp.bool_))
         mask = jnp.expand_dims(mask, axis=(0, 1))
         
         # Apply Transformer blocks
-        for _ in range(self.depth):
+        for i in range(self.depth):
             # Attention block
             y = nn.LayerNorm()(x)
-            # Self-attention over time with explicit cuDNN FlashAttention backend
-            y = nn.MultiHeadDotProductAttention(
+            # Self-attention over time
+            y = nn.SelfAttention(
+                name=f"SelfAttention_{i}",
                 num_heads=self.num_heads,
-                dot_product_attention_kwargs={"implementation": "cudnn"}
-            )(y, y, mask=mask)
+            )(y, mask=mask)
             x = x + y
 
             # MLP block
